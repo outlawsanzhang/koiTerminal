@@ -23,6 +23,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
+import android.util.Log
 import com.android.virtualization.terminal.MainActivity.Companion.TAG
 import androidx.annotation.WorkerThread
 import androidx.annotation.UiThread
@@ -55,6 +56,7 @@ class FileExposer : DocumentsProvider() {
     
     @UiThread
     override fun onCreate(): Boolean {
+        Log.i(TAG, "onCreate")
         return true
     }
     
@@ -65,6 +67,7 @@ class FileExposer : DocumentsProvider() {
 
     @WorkerThread
     override fun queryRoots(projection: Array<out String>?): Cursor {
+        Log.i(TAG, "queryRoots")
         return MatrixCursor(projection ?: DEFAULT_ROOT_PROJECTION)
             .apply {
                 val row = newRow()
@@ -92,6 +95,7 @@ class FileExposer : DocumentsProvider() {
 
     @WorkerThread
     fun addFileToCursor(documentId: String, cursor: MatrixCursor) {
+        Log.i(TAG, "addFileToCursor: $documentId")
         val context = context
         if (context == null) return
         val file = File(context.filesDir, documentId)
@@ -134,6 +138,7 @@ class FileExposer : DocumentsProvider() {
         projection: Array<out String>?,
         sortOrder: String?
     ): Cursor {
+        Log.i(TAG, "queryChildDocuments: $parentDocumentId")
         return MatrixCursor(resolveProjection(projection)).apply {
             val context = context
             if (context == null || parentDocumentId == null) return@apply
@@ -141,16 +146,19 @@ class FileExposer : DocumentsProvider() {
             parent.listFiles()?.forEach { file ->
                 addFileToCursor(File(parentDocumentId, file.getName()).getPath(), this)
             }
+            Log.i(TAG, "queryChildDocuments - done, ${this.getCount()} rows, ${this.getColumnCount()} columns")
             setNotificationUri(context.getContentResolver(), buildUri(parentDocumentId))
         }
     }
 
     @WorkerThread
     override fun queryDocument(documentId: String?, projection: Array<out String>?): Cursor {
+        Log.i(TAG, "queryDocument: $documentId")
         return MatrixCursor(resolveProjection(projection)).apply {
             val context = context
             if (context == null || documentId == null) return@apply
             addFileToCursor(documentId, this)
+            Log.i(TAG, "queryDocument - done, ${this.getCount()} rows, ${this.getColumnCount()} columns")
             setNotificationUri(context.getContentResolver(), buildUri(documentId))
         }
     }
@@ -158,6 +166,7 @@ class FileExposer : DocumentsProvider() {
     @WorkerThread
     override fun openDocument(documentId: String?, mode: String?, signal: CancellationSignal?):
         ParcelFileDescriptor {
+        Log.i(TAG, "openDocument, mode $mode: $documentId")
         val context = context
         if (context == null || documentId == null || mode == null) throw FileNotFoundException(documentId)
         val file = File(context.filesDir, documentId)
@@ -169,6 +178,7 @@ class FileExposer : DocumentsProvider() {
 
     @WorkerThread
     override fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
+        Log.i(TAG, "createDocument: $parentDocumentId -> $displayName")
         val context = context
         if (context == null || parentDocumentId == null || displayName == null){
             throw FileNotFoundException("$parentDocumentId -> $displayName")
@@ -183,12 +193,14 @@ class FileExposer : DocumentsProvider() {
 
     @WorkerThread
     override fun deleteDocument(documentId: String?) {
+        Log.i(TAG, "deleteDocument: $documentId")
         if (documentId == null) return
         removeDocument(documentId, null)
     }
 
     @WorkerThread
     override fun removeDocument(documentId: String?, parentDocumentId: String?) {
+        Log.i(TAG, "removeDocument: $documentId")
         context?.let {
             if (documentId == null) return
             var file = File(it.filesDir, documentId)
@@ -203,6 +215,7 @@ class FileExposer : DocumentsProvider() {
     
     @WorkerThread
     override fun renameDocument(documentId: String?, displayName: String?): String? {
+        Log.i(TAG, "renameDocument: $documentId -> $displayName")
         context?.let {
             if (documentId == null || displayName == null) return documentId
             var file = File(it.filesDir, documentId)
