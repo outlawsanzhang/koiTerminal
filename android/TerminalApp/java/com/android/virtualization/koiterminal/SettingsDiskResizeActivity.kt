@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.content.Intent
@@ -33,7 +33,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
-import com.android.virtualization.terminal.VmLauncherService.VmLauncherServiceCallback
+import com.android.virtualization.koiterminal.VmLauncherService.VmLauncherServiceCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import java.util.Locale

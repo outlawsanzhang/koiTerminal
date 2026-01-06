@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.app.Notification
 import android.app.PendingIntent
@@ -27,12 +27,12 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import com.android.internal.annotations.GuardedBy
-import com.android.virtualization.terminal.ImageArchive.Companion.fromInternet
-import com.android.virtualization.terminal.ImageArchive.Companion.fromSdCard
-import com.android.virtualization.terminal.InstalledImage.Companion.getDefault
-import com.android.virtualization.terminal.InstallerService.InstallerServiceImpl
-import com.android.virtualization.terminal.InstallerService.WifiCheckInputStream.NoWifiException
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.ImageArchive.Companion.fromInternet
+import com.android.virtualization.koiterminal.ImageArchive.Companion.fromSdCard
+import com.android.virtualization.koiterminal.InstalledImage.Companion.getDefault
+import com.android.virtualization.koiterminal.InstallerService.InstallerServiceImpl
+import com.android.virtualization.koiterminal.InstallerService.WifiCheckInputStream.NoWifiException
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import java.io.IOException
 import java.io.InputStream
 import java.lang.Exception

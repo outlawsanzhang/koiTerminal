@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.database.Cursor
 import android.database.MatrixCursor
@@ -23,7 +23,7 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import android.util.Log
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import androidx.annotation.WorkerThread
 import androidx.annotation.UiThread
 import java.io.File
@@ -72,7 +72,7 @@ class FileExposer : DocumentsProvider() {
                 with(row) {
                     add(DocumentsContract.Root.COLUMN_ROOT_ID, ROOT_FILES_ID)
                     add(DocumentsContract.Root.COLUMN_ICON, R.drawable.ic_launcher_foreground)
-                    add(DocumentsContract.Root.COLUMN_TITLE, context?.getString(R.string.app_name) ?: "Terminal")
+                    add(DocumentsContract.Root.COLUMN_TITLE, context?.getString(R.string.app_name) ?: "koiTerminal")
                     add(DocumentsContract.Root.COLUMN_FLAGS, DocumentsContract.Root.FLAG_SUPPORTS_CREATE)
                     add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, ".")
                 }
