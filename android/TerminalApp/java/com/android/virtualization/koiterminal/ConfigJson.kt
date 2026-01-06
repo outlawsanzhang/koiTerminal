@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.content.pm.PackageManager
@@ -22,13 +22,13 @@ import android.system.virtualmachine.VirtualMachineConfig
 import android.system.virtualmachine.VirtualMachineCustomImageConfig
 import android.util.DisplayMetrics
 import android.view.WindowManager
-import com.android.virtualization.terminal.ConfigJson.AudioJson
-import com.android.virtualization.terminal.ConfigJson.DiskJson
-import com.android.virtualization.terminal.ConfigJson.DisplayJson
-import com.android.virtualization.terminal.ConfigJson.GpuJson
-import com.android.virtualization.terminal.ConfigJson.InputJson
-import com.android.virtualization.terminal.ConfigJson.PartitionJson
-import com.android.virtualization.terminal.ConfigJson.SharedPathJson
+import com.android.virtualization.koiterminal.ConfigJson.AudioJson
+import com.android.virtualization.koiterminal.ConfigJson.DiskJson
+import com.android.virtualization.koiterminal.ConfigJson.DisplayJson
+import com.android.virtualization.koiterminal.ConfigJson.GpuJson
+import com.android.virtualization.koiterminal.ConfigJson.InputJson
+import com.android.virtualization.koiterminal.ConfigJson.PartitionJson
+import com.android.virtualization.koiterminal.ConfigJson.SharedPathJson
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import java.io.BufferedReader

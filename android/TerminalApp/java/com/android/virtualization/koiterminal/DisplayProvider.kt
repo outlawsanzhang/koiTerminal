@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.crosvm.ICrosvmAndroidDisplayService
 import android.graphics.PixelFormat
@@ -26,8 +26,8 @@ import android.util.Log
 import android.view.SurfaceControl
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import com.android.virtualization.terminal.DisplayProvider.CursorHandler
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.DisplayProvider.CursorHandler
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import java.io.IOException
 import java.lang.Exception
 import java.lang.RuntimeException

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.system.virtualmachine.VirtualMachine
@@ -22,7 +22,7 @@ import android.system.virtualmachine.VirtualMachineConfig
 import android.system.virtualmachine.VirtualMachineException
 import android.system.virtualmachine.VirtualMachineManager
 import android.util.Log
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 

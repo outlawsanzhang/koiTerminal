@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.annotation.MainThread
 import android.content.ComponentName
@@ -32,11 +32,11 @@ import android.view.View
 import android.widget.CheckBox
 import android.widget.TextView
 import com.android.internal.annotations.VisibleForTesting
-import com.android.virtualization.terminal.ImageArchive.Companion.fromSdCard
-import com.android.virtualization.terminal.ImageArchive.Companion.getDefault
-import com.android.virtualization.terminal.InstallerActivity.InstallProgressListener
-import com.android.virtualization.terminal.InstallerActivity.InstallerServiceConnection
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.ImageArchive.Companion.fromSdCard
+import com.android.virtualization.koiterminal.ImageArchive.Companion.getDefault
+import com.android.virtualization.koiterminal.InstallerActivity.InstallProgressListener
+import com.android.virtualization.koiterminal.InstallerActivity.InstallerServiceConnection
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.snackbar.Snackbar
 import java.io.IOException
