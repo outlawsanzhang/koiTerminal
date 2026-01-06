@@ -257,20 +257,25 @@ class VmLauncherService : Service() {
             .thenAcceptAsync(
                 { info ->
                     // It must exist because it is checked in `getTerminalServiceInfo`
+                    Log.i("$TAG-getTerminalServiceInfo()", "thenAcceptAsync")
                     val ipAddress =
                         info.hostAddresses.firstOrNull { !it.isLinkLocalAddress }!!.hostAddress
                     val port = info.port
+                    Log.i("$TAG-getTerminalServiceInfo().thenAcceptAsync", "ip = $ipAddress, port = $port")
                     val bundle = Bundle()
                     bundle.putString(KEY_TERMINAL_IPADDRESS, ipAddress)
                     bundle.putInt(KEY_TERMINAL_PORT, port)
+                    Log.i("$TAG-getTerminalServiceInfo().thenAcceptAsync", "Sending result RESULT_TERMINAL_AVAIL")
                     resultReceiver.send(RESULT_TERMINAL_AVAIL, bundle)
+                    Log.i("$TAG-getTerminalServiceInfo().thenAcceptAsync", "Running startDebianServer()")
                     startDebianServer(ipAddress)
+                    Log.i("$TAG-getTerminalServiceInfo().thenAcceptAsync", "Finished running startDebianServer()")
                 },
                 bgThreads,
             )
             .exceptionallyAsync(
                 { e ->
-                    Log.e(TAG, "Failed to start VM", e)
+                    Log.e("$TAG-VmLauncherService", "Failed to start VM", e)
                     resultReceiver.send(RESULT_ERROR, null)
                     stopSelf()
                     null
@@ -570,6 +575,7 @@ class VmLauncherService : Service() {
                         when (resultCode) {
                             RESULT_START -> callback.onVmStart()
                             RESULT_TERMINAL_AVAIL -> {
+                                Log.i(TAG, "received result RESULT_TERMINAL_AVAIL")
                                 val ipAddress = resultData!!.getString(KEY_TERMINAL_IPADDRESS)
                                 val port = resultData!!.getInt(KEY_TERMINAL_PORT)
                                 callback.onTerminalAvailable(TerminalInfo(ipAddress!!, port))
