@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.annotation.MainThread
 import android.content.Context
@@ -24,7 +24,8 @@ import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.View
 import android.widget.TextView
-import com.android.virtualization.terminal.BetterBugLauncher.Companion.launchBetterBugActivity
+import com.android.virtualization.koiterminal.BetterBugLauncher.Companion.launchBetterBugActivity
+import androidx.core.content.FileProvider
 import java.io.IOException
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -109,6 +110,10 @@ class ErrorActivity : BaseActivity() {
         private const val TAG = "TerminalError"
 
         private const val EXTRA_CAUSE = "cause"
+
+        // Defined in AndroidManifest.xml
+        private const val FILE_PROVIDER_AUTHORITY =
+            "com.android.virtualization.koiterminal.fileprovider"
 
         fun start(context: Context, e: Exception) {
             val intent = Intent(context, ErrorActivity::class.java)

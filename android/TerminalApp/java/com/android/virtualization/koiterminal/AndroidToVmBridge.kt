@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.system.ErrnoException
 import android.system.Os

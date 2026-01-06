@@ -22,7 +22,7 @@
     <!-- ================================================================= -->
 
     <!-- Application name of this terminal app shown in the launcher. This app provides computer terminal to connect to virtual machine. [CHAR LIMIT=16] -->
-    <string name="app_name">Terminal</string>
+    <string name="app_name">koiTerminal</string>
     <!-- Action bar icon name for the settings view CHAR LIMIT=none] -->
     <string name="action_settings">Settings</string>
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.core
+package com.android.virtualization.koiterminal.new2.core
 
 import android.content.Context
 import android.content.Intent
@@ -21,9 +21,9 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.android.virtualization.terminal.ImageArchive
-import com.android.virtualization.terminal.InstalledImage
-import com.android.virtualization.terminal.new2.util.LoggingMutableStateFlow
+import com.android.virtualization.koiterminal.ImageArchive
+import com.android.virtualization.koiterminal.InstalledImage
+import com.android.virtualization.koiterminal.new2.util.LoggingMutableStateFlow
 import java.io.IOException
 import java.io.InputStream
 import kotlin.coroutines.cancellation.CancellationException

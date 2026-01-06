@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.content.res.Configuration
 import android.view.WindowInsets as ViewWindowInsets

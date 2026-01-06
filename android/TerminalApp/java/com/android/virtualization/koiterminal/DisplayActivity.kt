@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.app.PictureInPictureParams
 import android.content.pm.ActivityInfo
@@ -37,7 +37,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
-import com.android.virtualization.terminal.new2.ui.main.DisplayResolution
+import com.android.virtualization.koiterminal.new2.ui.main.DisplayResolution
 import com.google.android.material.button.MaterialButton
 
 class DisplayActivity : BaseActivity() {

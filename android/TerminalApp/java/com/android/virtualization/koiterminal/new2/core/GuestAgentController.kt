@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.core
+package com.android.virtualization.koiterminal.new2.core
 
 import android.content.Context
 import android.system.virtualizationcommon.IGuestAgent
 import android.util.Log
 import com.android.virtualization.debian.aidl.IDebianService
-import com.android.virtualization.terminal.ClipboardController
-import com.android.virtualization.terminal.DebianService
-import com.android.virtualization.terminal.DebianServiceBase
-import com.android.virtualization.terminal.DebianServiceGrpc
-import com.android.virtualization.terminal.PortsStateManager
-import com.android.virtualization.terminal.StorageBalloonWorker
+import com.android.virtualization.koiterminal.ClipboardController
+import com.android.virtualization.koiterminal.DebianService
+import com.android.virtualization.koiterminal.DebianServiceBase
+import com.android.virtualization.koiterminal.DebianServiceGrpc
+import com.android.virtualization.koiterminal.PortsStateManager
+import com.android.virtualization.koiterminal.StorageBalloonWorker
 import io.grpc.InsecureServerCredentials
 import io.grpc.Server
 import io.grpc.okhttp.OkHttpServerBuilder

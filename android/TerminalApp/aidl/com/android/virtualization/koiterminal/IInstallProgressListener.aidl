@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.virtualization.terminal;
+package com.android.virtualization.koiterminal;
 
 // TODO(b/374015561): Provide progress update
 oneway interface IInstallProgressListener {

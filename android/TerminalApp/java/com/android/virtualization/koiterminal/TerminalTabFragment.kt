@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.annotation.IntDef
 import android.annotation.MainThread
@@ -39,8 +39,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import com.android.virtualization.terminal.CertificateUtils.createOrGetKey
-import com.android.virtualization.terminal.CertificateUtils.writeCertificateToFile
+import com.android.virtualization.koiterminal.CertificateUtils.createOrGetKey
+import com.android.virtualization.koiterminal.CertificateUtils.writeCertificateToFile
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
 

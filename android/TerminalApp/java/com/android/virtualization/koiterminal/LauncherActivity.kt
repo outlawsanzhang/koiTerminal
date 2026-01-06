@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import com.android.system.virtualmachine.flags.Flags
-import com.android.virtualization.terminal.new2.ui.MainActivity as NewUiMainActivity
+import com.android.virtualization.koiterminal.new2.ui.MainActivity as NewUiMainActivity
 
 class LauncherActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {

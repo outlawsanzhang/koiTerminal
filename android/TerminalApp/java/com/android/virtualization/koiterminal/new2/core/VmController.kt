@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.core
+package com.android.virtualization.koiterminal.new2.core
 
 import android.content.Context
 import android.content.Intent
@@ -32,16 +32,16 @@ import android.system.virtualmachine.VirtualMachineManager
 import android.util.Log
 import com.android.system.virtualmachine.flags.Flags
 import com.android.virtualization.debian.aidl.IDebianService
-import com.android.virtualization.terminal.AndroidToVmBridge
-import com.android.virtualization.terminal.CertificateUtils
-import com.android.virtualization.terminal.ConfigJson
-import com.android.virtualization.terminal.GraphicsManager
-import com.android.virtualization.terminal.InstalledImage
-import com.android.virtualization.terminal.InstalledImage.Companion.roundUp
-import com.android.virtualization.terminal.Logger
-import com.android.virtualization.terminal.TerminalThreadFactory
-import com.android.virtualization.terminal.new2.ui.main.SettingsViewModel
-import com.android.virtualization.terminal.new2.util.LoggingMutableStateFlow
+import com.android.virtualization.koiterminal.AndroidToVmBridge
+import com.android.virtualization.koiterminal.CertificateUtils
+import com.android.virtualization.koiterminal.ConfigJson
+import com.android.virtualization.koiterminal.GraphicsManager
+import com.android.virtualization.koiterminal.InstalledImage
+import com.android.virtualization.koiterminal.InstalledImage.Companion.roundUp
+import com.android.virtualization.koiterminal.Logger
+import com.android.virtualization.koiterminal.TerminalThreadFactory
+import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
+import com.android.virtualization.koiterminal.new2.util.LoggingMutableStateFlow
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
