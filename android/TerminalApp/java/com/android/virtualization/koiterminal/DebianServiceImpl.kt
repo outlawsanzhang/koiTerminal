@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.util.Log
 import androidx.annotation.Keep
 import com.android.internal.annotations.GuardedBy
 import com.android.system.virtualmachine.flags.Flags
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import com.android.virtualization.terminal.proto.DebianServiceGrpc.DebianServiceImplBase
 import com.android.virtualization.terminal.proto.ForwardingRequestItem
 import com.android.virtualization.terminal.proto.QueueOpeningRequest

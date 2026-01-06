@@ -18,7 +18,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
 
     <!-- Application name of this terminal app shown in the launcher. This app provides computer terminal to connect to virtual machine. [CHAR LIMIT=16] -->
-    <string name="app_name">Terminal</string>
+    <string name="app_name">koiTerminal</string>
 
     <!-- Description of the entire terminal display showing texts. This is read by talkback. [CHAR LIMIT=none] -->
     <string name="terminal_display">Terminal display</string>
