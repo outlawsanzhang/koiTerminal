@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.app.Notification
 import android.app.NotificationManager
@@ -41,9 +41,9 @@ import android.system.virtualmachine.VirtualMachineException
 import android.util.Log
 import androidx.annotation.WorkerThread
 import com.android.system.virtualmachine.flags.Flags
-import com.android.virtualization.terminal.InstalledImage.Companion.roundUp
-import com.android.virtualization.terminal.MainActivity.Companion.PREFIX
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.InstalledImage.Companion.roundUp
+import com.android.virtualization.koiterminal.MainActivity.Companion.PREFIX
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import io.grpc.Grpc
 import io.grpc.InsecureServerCredentials
 import io.grpc.Metadata

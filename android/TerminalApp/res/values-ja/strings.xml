@@ -16,7 +16,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name" msgid="5597111707986572208">"ターミナル"</string>
+    <string name="app_name" msgid="5597111707986572208">"koiターミナル"</string>
     <string name="terminal_display" msgid="4810127497644015237">"ターミナルの表示"</string>
     <string name="terminal_input" msgid="4602512831433433551">"カーソル"</string>
     <string name="empty_line" msgid="5012067143408427178">"空の行"</string>
