@@ -146,7 +146,8 @@ internal class ImageArchive {
         // TODO(b/403131508): externalize the version number
         private const val VERSION_INT = 4_000_000 // v4.0.0
         private val BUILD_TAG = VERSION_INT / 1_000_000 * 1_000_000 // Use only the major version
-        private val HOST_URL = "https://dl.google.com/android/ferrochrome/$BUILD_TAG"
+        // private val HOST_URL = "https://dl.google.com/android/ferrochrome/$BUILD_TAG"
+        private val HOST_URL = "https://example.com/android/ferrochrome/$BUILD_TAG" // disable downloading
 
         fun getSdcardPathForTesting(): Path {
             return Environment.getExternalStoragePublicDirectory(DIR_IN_SDCARD).toPath()
