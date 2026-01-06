@@ -265,10 +265,17 @@ public class MainActivity :
     }
 
     fun connectToTerminalService(terminalFragment: TerminalTabFragment) {
+        Log.i(TAG, "connectToTerminalService()")
         terminalInfo.thenAcceptAsync(
             { info ->
+                Log.i("$TAG-terminalInfo.thenAcceptAsync()", "info={ipAddress: ${info.ipAddress}, port=${info.port}}")
                 val url = getTerminalServiceUrl(info.ipAddress, info.port)
-                runOnUiThread({ terminalFragment.loadUrl(url!!.toString()) })
+                Log.i("$TAG-terminalInfo.thenAcceptAsync()", "url=$url")
+                runOnUiThread({
+                    Log.i("$TAG-terminalInfo.thenAcceptAsync()-runOnUiThread", "Loading url")
+                    terminalFragment.loadUrl(url!!.toString())
+                    Log.i("$TAG-terminalInfo.thenAcceptAsync()-runOnUiThread", "Loaded url")
+                })
             },
             executorService,
         )
@@ -292,6 +299,7 @@ public class MainActivity :
     }
 
     override fun onTerminalAvailable(info: TerminalInfo) {
+        Log.i(TAG, "onTerminalAvailable()")
         terminalInfo.complete(info)
     }
 
@@ -408,7 +416,7 @@ public class MainActivity :
         try {
             startForegroundService(intent)
         } catch (e: ForegroundServiceStartNotAllowedException) {
-            Log.e(TAG, "Failed to start VM", e)
+            Log.e("$TAG-MainActivity", "Failed to start VM", e)
             finish()
         }
     }
