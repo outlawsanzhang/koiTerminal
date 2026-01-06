@@ -151,6 +151,7 @@ class InstallerService : Service() {
     private fun downloadFromSdcard(): Boolean {
         val archive = fromSdCard()
         val archive_path = archive.getPath()
+        Log.i(TAG, "Entering downloadFromSdcard with $archive_path")
 
         if (!archive.exists()) {
             return false
