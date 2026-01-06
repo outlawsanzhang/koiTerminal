@@ -299,6 +299,7 @@ internal class ImageArchive {
                 if (listOf<String?>(*Build.SUPPORTED_ABIS).contains("x86_64")) "x86_64"
                 else "aarch64"
             try {
+                Log.d(TAG, "Install URL $HOST_URL/$arch/$ARCHIVE_NAME")
                 return ImageArchive(
                     URL("$HOST_URL/$arch/$ARCHIVE_NAME"),
                     getSdcardPathForTesting().resolve(CIDATA_NAME),

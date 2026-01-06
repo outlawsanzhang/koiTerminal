@@ -199,8 +199,10 @@ class VmLauncherService : Service() {
         portNotifier = PortNotifier(this)
 
         if (canUseTtydOverVsock()) {
+            Log.i(TAG, "canUseTtydOverVsock() true")
             val bridge = AndroidToVmBridge(virtualMachine.getCid())
             val port = bridge.start()
+            Log.i(TAG, "canUseTtydOverVsock() bridge started, port = $port")
             if (port == null) {
                 Log.e(TAG, "Failed to start bridge")
                 resultReceiver.send(RESULT_ERROR, null)
@@ -210,22 +212,28 @@ class VmLauncherService : Service() {
                 bundle.putString(KEY_TERMINAL_IPADDRESS, "localhost")
                 bundle.putInt(KEY_TERMINAL_PORT, port)
                 bundle.putString(KEY_TERMINAL_KEY, bridge.secretKey)
+                Log.i(TAG, "canUseTtydOverVsock() Sending result RESULT_TERMINAL_AVAIL")
                 resultReceiver.send(RESULT_TERMINAL_AVAIL, bundle)
+                Log.i(TAG, "canUseTtydOverVsock() Sent result RESULT_TERMINAL_AVAIL")
             }
         } else {
             getTerminalServiceInfo(timeout_secs)
                 .thenAcceptAsync(
                     { info ->
                         // It must exist because it is checked in `getTerminalServiceInfo`
+                        Log.i("$TAG-getTerminalServiceInfo()", "thenAcceptAsync")
                         val guestIpAddress =
                             info.hostAddresses
                                 .firstOrNull { !it.isLinkLocalAddress }!!
                                 .hostAddress!!
+                        Log.i("$TAG-getTerminalServiceInfo().thenAcceptAsync", "ip = $guestIpAddress")
 
                         val bundle = Bundle()
                         bundle.putString(KEY_TERMINAL_IPADDRESS, guestIpAddress)
                         bundle.putInt(KEY_TERMINAL_PORT, info.port)
+                        Log.i("$TAG-getTerminalServiceInfo().thenAcceptAsync", "Sending result RESULT_TERMINAL_AVAIL")
                         resultReceiver.send(RESULT_TERMINAL_AVAIL, bundle)
+                        Log.i("$TAG-getTerminalServiceInfo().thenAcceptAsync", "Sent result RESULT_TERMINAL_AVAIL")
                     },
                     bgThreads,
                 )
@@ -492,6 +500,7 @@ class VmLauncherService : Service() {
                         when (resultCode) {
                             RESULT_START -> callback.onVmStart()
                             RESULT_TERMINAL_AVAIL -> {
+                                Log.i(TAG, "received result RESULT_TERMINAL_AVAIL")
                                 val ipAddress = resultData!!.getString(KEY_TERMINAL_IPADDRESS)
                                 val port = resultData!!.getInt(KEY_TERMINAL_PORT)
                                 val key = resultData!!.getString(KEY_TERMINAL_KEY)
