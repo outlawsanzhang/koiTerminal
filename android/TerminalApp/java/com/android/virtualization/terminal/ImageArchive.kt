@@ -180,7 +180,7 @@ internal class ImageArchive {
          */
         fun getDefault(): ImageArchive {
             val archive = fromSdCard()
-            return if (Build.isDebuggable() && archive.exists()) {
+            return if (archive.exists()) { // TODO: check if this function is actually used.
                 archive
             } else {
                 fromInternet()
