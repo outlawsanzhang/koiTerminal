@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.core
+package com.android.virtualization.koiterminal.new2.core
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -30,9 +30,9 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.ui.MainActivity
-import com.android.virtualization.terminal.new2.ui.main.SettingsViewModel
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.ui.MainActivity
+import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.app.Activity
 import android.content.Intent
@@ -34,7 +34,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.android.virtualization.terminal.new2.ui.main.MainViewModel
+import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,8 +99,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_OPEN_SETTINGS_PORT =
-            "android.virtualization.terminal.action.OPEN_SETTINGS_PORT"
+            "android.virtualization.koiterminal.action.OPEN_SETTINGS_PORT"
         const val ACTION_OPEN_SETTINGS_KEEP_AWAKE =
-            "android.virtualization.terminal.action.OPEN_SETTINGS_KEEP_AWAKE"
+            "android.virtualization.koiterminal.action.OPEN_SETTINGS_KEEP_AWAKE"
     }
 }

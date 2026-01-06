@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.annotation.MainThread
 import android.app.Activity
@@ -23,7 +23,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.core.content.FileProvider
-import com.android.virtualization.terminal.InstalledImage.Companion.getDefault
+import com.android.virtualization.koiterminal.InstalledImage.Companion.getDefault
 import java.lang.Exception
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -120,7 +120,7 @@ class BetterBugLauncher {
 
         // Defined in AndroidManifest.xml
         private const val FILE_PROVIDER_AUTHORITY =
-            "com.android.virtualization.terminal.fileprovider"
+            "com.android.virtualization.koiterminal.fileprovider"
         private const val LOG_ZIP_DIR = "bugreport"
 
         // From go/betterbug-integration

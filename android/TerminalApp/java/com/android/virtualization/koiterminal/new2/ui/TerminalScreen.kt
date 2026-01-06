@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.view.KeyEvent
 import androidx.compose.foundation.background
@@ -66,12 +66,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.core.TerminalAddress
-import com.android.virtualization.terminal.new2.core.TerminalSession
-import com.android.virtualization.terminal.new2.ui.main.MainViewModel
-import com.android.virtualization.terminal.new2.ui.main.TerminalUiState
-import com.android.virtualization.terminal.new2.ui.main.TerminalViewModel
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.core.TerminalAddress
+import com.android.virtualization.koiterminal.new2.core.TerminalSession
+import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
+import com.android.virtualization.koiterminal.new2.ui.main.TerminalUiState
+import com.android.virtualization.koiterminal.new2.ui.main.TerminalViewModel
 
 val TAB_BAR_HEIGHT = 50.dp
 

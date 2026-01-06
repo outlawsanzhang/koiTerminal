@@ -16,7 +16,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name" msgid="5597111707986572208">"ટર્મિનલ"</string>
+    <string name="app_name" msgid="5597111707986572208">"koiટર્મિનલ"</string>
     <string name="action_settings" msgid="5729342767795123227">"સેટિંગ"</string>
     <string name="permission_dlg_title_required" msgid="7330907054330473886">"પરવાનગી જરૂરી છે"</string>
     <string name="permission_dlg_message_required" msgid="7912498378440483592">"યોગ્ય રીતે કાર્ય કરવા માટે Terminalને નીચે મુજબની પરવાનગીઓની જરૂર છે: <xliff:g id="PERMISSION_LIST">%s</xliff:g>"</string>
