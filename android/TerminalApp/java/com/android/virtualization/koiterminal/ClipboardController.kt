@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.ClipData
 import android.content.ClipboardManager

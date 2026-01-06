@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.android.virtualization.terminal;
+package com.android.virtualization.koiterminal;
 
-import com.android.virtualization.terminal.IInstallProgressListener;
+import com.android.virtualization.koiterminal.IInstallProgressListener;
 
 interface IInstallerService {
     void requestInstall(boolean isWifiOnly);

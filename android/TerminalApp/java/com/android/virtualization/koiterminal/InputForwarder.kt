@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.hardware.input.InputManager
@@ -25,7 +25,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 
 /** Forwards input events (touch, mouse, ...) from Android to VM */
 internal class InputForwarder(

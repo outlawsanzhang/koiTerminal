@@ -16,7 +16,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name" msgid="5597111707986572208">"টার্মিনাল"</string>
+    <string name="app_name" msgid="5597111707986572208">"koiটার্মিনাল"</string>
     <string name="action_settings" msgid="5729342767795123227">"সেটিংস"</string>
     <string name="permission_dlg_title_required" msgid="7330907054330473886">"অনুমতি দিতে হবে"</string>
     <string name="permission_dlg_message_required" msgid="7912498378440483592">"সঠিকভাবে কাজ করার জন্য টার্মিনালের নিম্নলিখিত অনুমতিগুলি প্রয়োজন: <xliff:g id="PERMISSION_LIST">%s</xliff:g>"</string>

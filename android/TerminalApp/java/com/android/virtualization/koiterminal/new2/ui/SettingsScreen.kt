@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.icu.number.NumberFormatter
 import android.icu.number.NumberRangeFormatter
@@ -88,13 +88,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.android.virtualization.terminal.GraphicsManager
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.core.OpenPort
-import com.android.virtualization.terminal.new2.core.VmController
-import com.android.virtualization.terminal.new2.ui.main.DisplayResolution
-import com.android.virtualization.terminal.new2.ui.main.MainViewModel
-import com.android.virtualization.terminal.new2.ui.main.SettingsViewModel
+import com.android.virtualization.koiterminal.GraphicsManager
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.core.OpenPort
+import com.android.virtualization.koiterminal.new2.core.VmController
+import com.android.virtualization.koiterminal.new2.ui.main.DisplayResolution
+import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
+import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
 import java.math.RoundingMode
 import java.util.Locale
 import kotlin.math.log2

@@ -16,7 +16,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name" msgid="5597111707986572208">"ターミナル"</string>
+    <string name="app_name" msgid="5597111707986572208">"koiターミナル"</string>
     <string name="action_settings" msgid="5729342767795123227">"設定"</string>
     <string name="permission_dlg_title_required" msgid="7330907054330473886">"権限が必要です"</string>
     <string name="permission_dlg_message_required" msgid="7912498378440483592">"ターミナルを正しく動作させるには、<xliff:g id="PERMISSION_LIST">%s</xliff:g>の権限が必要です"</string>

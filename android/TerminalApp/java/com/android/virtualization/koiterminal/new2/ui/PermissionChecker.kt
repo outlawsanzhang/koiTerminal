@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.Manifest
 import android.app.Activity
@@ -39,8 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.ui.main.MainViewModel
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
 import kotlinx.coroutines.launch
 
 val PERMISSIONS =

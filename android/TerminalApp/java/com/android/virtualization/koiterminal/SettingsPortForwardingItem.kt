@@ -13,6 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 class SettingsPortForwardingItem(val port: Int, val enabled: Boolean) {}

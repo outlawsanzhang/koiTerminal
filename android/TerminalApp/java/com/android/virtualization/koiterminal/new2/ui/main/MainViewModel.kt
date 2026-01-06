@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui.main
+package com.android.virtualization.koiterminal.new2.ui.main
 
 import android.Manifest
 import android.app.Application
@@ -23,16 +23,16 @@ import android.hardware.input.InputManager
 import android.view.InputDevice
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.android.virtualization.terminal.new2.core.InstallState
-import com.android.virtualization.terminal.new2.core.Installer
-import com.android.virtualization.terminal.new2.core.TerminalAddress
-import com.android.virtualization.terminal.new2.core.TerminalSession
-import com.android.virtualization.terminal.new2.core.TerminalSessionRepository
-import com.android.virtualization.terminal.new2.core.VmController
-import com.android.virtualization.terminal.new2.core.VmState
-import com.android.virtualization.terminal.new2.ui.MainActivity
-import com.android.virtualization.terminal.new2.ui.PERMISSIONS
-import com.android.virtualization.terminal.new2.ui.SettingsDestination
+import com.android.virtualization.koiterminal.new2.core.InstallState
+import com.android.virtualization.koiterminal.new2.core.Installer
+import com.android.virtualization.koiterminal.new2.core.TerminalAddress
+import com.android.virtualization.koiterminal.new2.core.TerminalSession
+import com.android.virtualization.koiterminal.new2.core.TerminalSessionRepository
+import com.android.virtualization.koiterminal.new2.core.VmController
+import com.android.virtualization.koiterminal.new2.core.VmState
+import com.android.virtualization.koiterminal.new2.ui.MainActivity
+import com.android.virtualization.koiterminal.new2.ui.PERMISSIONS
+import com.android.virtualization.koiterminal.new2.ui.SettingsDestination
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

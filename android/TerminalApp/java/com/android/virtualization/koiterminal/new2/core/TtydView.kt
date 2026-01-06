@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.core
+package com.android.virtualization.koiterminal.new2.core
 
 import android.content.Context
 import android.content.Intent
@@ -37,8 +37,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import com.android.virtualization.terminal.CertificateUtils
-import com.android.virtualization.terminal.TerminalView
+import com.android.virtualization.koiterminal.CertificateUtils
+import com.android.virtualization.koiterminal.TerminalView
 import java.net.MalformedURLException
 import java.net.URL
 import java.security.cert.X509Certificate

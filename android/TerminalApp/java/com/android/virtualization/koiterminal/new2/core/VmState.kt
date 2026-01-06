@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.core
+package com.android.virtualization.koiterminal.new2.core
 
 data class TerminalAddress(val ipAddress: String, val port: Int, val key: String? = null)
 

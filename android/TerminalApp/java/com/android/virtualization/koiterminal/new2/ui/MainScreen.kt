@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.app.Activity
 import android.provider.Settings
@@ -63,13 +63,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.android.virtualization.terminal.BetterBugLauncher
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.core.InstallState
-import com.android.virtualization.terminal.new2.core.Installer
-import com.android.virtualization.terminal.new2.ui.main.DisplayState
-import com.android.virtualization.terminal.new2.ui.main.MainUiState
-import com.android.virtualization.terminal.new2.ui.main.MainViewModel
+import com.android.virtualization.koiterminal.BetterBugLauncher
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.core.InstallState
+import com.android.virtualization.koiterminal.new2.core.Installer
+import com.android.virtualization.koiterminal.new2.ui.main.DisplayState
+import com.android.virtualization.koiterminal.new2.ui.main.MainUiState
+import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
@@ -50,9 +50,9 @@ import androidx.activity.viewModels
 import androidx.viewpager2.widget.ViewPager2
 import com.android.internal.annotations.VisibleForTesting
 import com.android.microdroid.test.common.DeviceProperties
-import com.android.virtualization.terminal.BetterBugLauncher.Companion.launchBetterBugActivity
-import com.android.virtualization.terminal.ErrorActivity.Companion.start
-import com.android.virtualization.terminal.VmLauncherService.VmLauncherServiceCallback
+import com.android.virtualization.koiterminal.BetterBugLauncher.Companion.launchBetterBugActivity
+import com.android.virtualization.koiterminal.ErrorActivity.Companion.start
+import com.android.virtualization.koiterminal.VmLauncherService.VmLauncherServiceCallback
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import java.net.MalformedURLException
@@ -450,7 +450,7 @@ public class MainActivity :
 
     companion object {
         const val TAG: String = "VmTerminalApp"
-        const val PREFIX: String = "com.android.virtualization.terminal."
+        const val PREFIX: String = "com.android.virtualization.koiterminal."
         private val TERMINAL_CONNECTION_TIMEOUT_MS: Int
         private const val REQUEST_CODE_INSTALLER = 0x33
         private const val FONT_SIZE_DEFAULT = 13
