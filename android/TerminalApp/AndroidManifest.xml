@@ -43,7 +43,7 @@
         android:theme="@style/VmTerminalAppTheme"
         android:usesCleartextTraffic="true"
         android:supportsRtl="true"
-        android:enabled="false"
+        android:enabled="true"
         android:name=".Application">
         <activity android:name=".LauncherActivity"
                   android:exported="true">
