@@ -311,7 +311,7 @@ internal class ImageArchive {
 
         /** Return whether sdcard image would be used for debugging purpose. */
         fun isLocalImage(): Boolean {
-            return Build.isDebuggable() && fromSdCard().exists()
+            return fromSdCard().exists()
         }
 
         /**
