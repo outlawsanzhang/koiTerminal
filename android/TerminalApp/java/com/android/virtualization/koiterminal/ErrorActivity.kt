@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.annotation.MainThread
 import android.content.Context
@@ -27,7 +27,7 @@ import android.view.View
 import android.widget.TextView
 import androidx.annotation.WorkerThread
 import androidx.core.content.FileProvider
-import com.android.virtualization.terminal.InstalledImage.Companion.getDefault
+import com.android.virtualization.koiterminal.InstalledImage.Companion.getDefault
 import java.io.IOException
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -202,7 +202,7 @@ class ErrorActivity : BaseActivity() {
 
         // Defined in AndroidManifest.xml
         private const val FILE_PROVIDER_AUTHORITY =
-            "com.android.virtualization.terminal.fileprovider"
+            "com.android.virtualization.koiterminal.fileprovider"
         private const val LOG_ZIP_DIR = "bugreport"
 
         // From go/betterbug-integration
