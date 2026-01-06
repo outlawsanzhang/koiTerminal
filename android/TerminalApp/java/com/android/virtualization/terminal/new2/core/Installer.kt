@@ -284,7 +284,9 @@ object Installer {
 
     private suspend fun checkInstallStatus() {
         _installState.value = InstallState.Checking
+        Log.i("Installer", "installedImage.isInstalled() = ${installedImage.isInstalled()}")
         if (installedImage.isInstalled()) {
+            Log.i("Installer", "installedImage.isCompatible() = ${installedImage.isCompatible(context)}")
             if (installedImage.isCompatible(context)) {
                 _installState.value = InstallState.Installed
             } else {
