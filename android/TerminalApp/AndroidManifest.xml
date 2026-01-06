@@ -92,6 +92,16 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/share_file_path" />
         </provider>
+        <provider
+            android:name="com.android.virtualization.terminal.FileExposer"
+            android:authorities="com.android.virtualization.terminal.documents"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS"
+            android:grantUriPermissions="true">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER"/>
+            </intent-filter>
+        </provider>
         <activity android:name=".InstallerActivity"
             android:exported="false">
             <intent-filter>
