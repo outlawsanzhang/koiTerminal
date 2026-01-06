@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.app.Application as AndroidApplication
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import com.android.system.virtualmachine.flags.Flags
-import com.android.virtualization.terminal.new2.core.Installer
-import com.android.virtualization.terminal.new2.core.VmController
+import com.android.virtualization.koiterminal.new2.core.Installer
+import com.android.virtualization.koiterminal.new2.core.VmController
 
 public class Application : AndroidApplication() {
     override fun onCreate() {

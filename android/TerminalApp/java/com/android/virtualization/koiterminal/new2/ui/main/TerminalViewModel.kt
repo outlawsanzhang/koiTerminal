@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui.main
+package com.android.virtualization.koiterminal.new2.ui.main
 
 import android.app.Application
 import android.content.Context
@@ -22,11 +22,11 @@ import android.util.Log
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.WindowManager.LayoutParams.TYPE_APPLICATION
 import androidx.lifecycle.AndroidViewModel
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.core.TerminalAddress
-import com.android.virtualization.terminal.new2.core.TtydView
-import com.android.virtualization.terminal.new2.core.VmController
-import com.android.virtualization.terminal.new2.util.LoggingMutableStateFlow
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.core.TerminalAddress
+import com.android.virtualization.koiterminal.new2.core.TtydView
+import com.android.virtualization.koiterminal.new2.core.VmController
+import com.android.virtualization.koiterminal.new2.util.LoggingMutableStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

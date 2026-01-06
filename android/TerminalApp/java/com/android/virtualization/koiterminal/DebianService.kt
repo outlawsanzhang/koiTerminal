@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.os.RemoteException
@@ -22,8 +22,8 @@ import android.util.Log
 import androidx.annotation.Keep
 import com.android.virtualization.debian.aidl.IDebianService
 import com.android.virtualization.debian.aidl.IVmActivePortListener
-import com.android.virtualization.terminal.ForwarderHost.ForwardingCallback
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallback
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import com.android.virtualization.terminal.proto.ActivePort
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

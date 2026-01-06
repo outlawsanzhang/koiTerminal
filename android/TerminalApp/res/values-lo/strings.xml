@@ -16,7 +16,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name" msgid="5597111707986572208">"ສະຖານີ"</string>
+    <string name="app_name" msgid="5597111707986572208">"koiສະຖານີ"</string>
     <string name="action_settings" msgid="5729342767795123227">"ການຕັ້ງຄ່າ"</string>
     <string name="permission_dlg_title_required" msgid="7330907054330473886">"ຈຳເປັນຕ້ອງມີການອະນຸຍາດ"</string>
     <string name="permission_dlg_message_required" msgid="7912498378440483592">"ເທີມິນອນຕ້ອງການການອະນຸຍາດຕໍ່ໄປນີ້ເພື່ອໃຫ້ເຮັດວຽກໄດ້ຢ່າງຖືກຕ້ອງ: <xliff:g id="PERMISSION_LIST">%s</xliff:g>"</string>

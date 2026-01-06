@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.os.storage.StorageManager
@@ -22,7 +22,7 @@ import android.util.Log
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import java.util.concurrent.TimeUnit
 
 class StorageBalloonWorker(appContext: Context, workerParams: WorkerParameters) :

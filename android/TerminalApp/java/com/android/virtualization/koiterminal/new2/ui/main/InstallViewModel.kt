@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui.main
+package com.android.virtualization.koiterminal.new2.ui.main
 
 import android.app.Activity
 import android.content.Intent
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.android.virtualization.terminal.BetterBugLauncher
-import com.android.virtualization.terminal.ImageArchive
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.core.InstallState
-import com.android.virtualization.terminal.new2.core.Installer
+import com.android.virtualization.koiterminal.BetterBugLauncher
+import com.android.virtualization.koiterminal.ImageArchive
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.core.InstallState
+import com.android.virtualization.koiterminal.new2.core.Installer
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted

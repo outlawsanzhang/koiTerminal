@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.content.res.Configuration
 import android.view.KeyEvent
@@ -70,7 +70,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.android.virtualization.terminal.R
+import com.android.virtualization.koiterminal.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout

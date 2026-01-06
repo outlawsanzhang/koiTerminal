@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal
+package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.os.FileUtils
@@ -22,7 +22,7 @@ import android.system.Os
 import android.system.OsConstants
 import android.util.Log
 import androidx.annotation.VisibleForTesting
-import com.android.virtualization.terminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import java.io.BufferedReader
 import java.io.FileReader
 import java.io.IOException

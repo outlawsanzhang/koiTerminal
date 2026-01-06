@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.virtualization.terminal.new2.ui
+package com.android.virtualization.koiterminal.new2.ui
 
 import android.app.Activity
 import android.text.format.Formatter
@@ -60,9 +60,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.android.virtualization.terminal.R
-import com.android.virtualization.terminal.new2.core.InstallState
-import com.android.virtualization.terminal.new2.ui.main.InstallViewModel
+import com.android.virtualization.koiterminal.R
+import com.android.virtualization.koiterminal.new2.core.InstallState
+import com.android.virtualization.koiterminal.new2.ui.main.InstallViewModel
 
 @Composable
 fun InstallScreen(snackbarHostState: SnackbarHostState, viewModel: InstallViewModel = viewModel()) {
