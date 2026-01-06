@@ -152,11 +152,6 @@ class InstallerService : Service() {
         val archive = fromSdCard()
         val archive_path = archive.getPath()
 
-        // Installing from sdcard is preferred, but only supported only in debuggable build.
-        if (!Build.isDebuggable()) {
-            Log.i(TAG, "Non-debuggable build doesn't support installation from $archive_path")
-            return false
-        }
         if (!archive.exists()) {
             return false
         }
