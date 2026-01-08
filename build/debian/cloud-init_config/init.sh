@@ -16,13 +16,15 @@ install_localdebs() {
 
 _copy_files() {
 	cp -vR "${LOCALFILES}"/* /
+	mkdir -p /mnt/internal
+	ln -s /dev/vda3 /mnt/internal/ca.crt
 }
 
 _restart_services() {
 	CONFIG_CHANGED_SERVICES=(
 		attach-cidata.service
 		backup_mount.service
-		mnt-shared.automount
+
 		ttyd_uds.service
 		ttyd_vsock_bridge.path
 		linux_vm_manager.service
