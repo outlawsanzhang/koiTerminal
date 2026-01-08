@@ -14,14 +14,16 @@ install_localdebs() {
 
 _copy_files() {
 	cp -vpR "${LOCALFILES}"/* /
+	mkdir -p /mnt/internal
+	ln -s /dev/vda3 /mnt/internal/ca.crt
 }
 
 _restart_services() {
 	CONFIG_CHANGED_SERVICES=(
 		avahi_ttyd.service
 		backup_mount.service
-		virtiofs.service
-		virtiofs_internal.service
+
+
 		ttyd.service
 	)
 	systemctl enable --now "${CONFIG_CHANGED_SERVICES[@]}"
