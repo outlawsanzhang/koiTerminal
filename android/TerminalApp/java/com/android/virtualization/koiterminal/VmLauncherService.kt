@@ -276,6 +276,14 @@ class VmLauncherService : Service() {
             .exceptionallyAsync(
                 { e ->
                     Log.e("$TAG-VmLauncherService", "Failed to start VM", e)
+                    // try {
+                    //     val vm = virtualMachine
+                    //     // val vmconfig = config.customImageConfig
+                    //     val console_out = vm.getConsoleOutput() // console_out: InputStream
+                    //     Log.i(TAG, "ASDF console out:", String(console_out.readAllBytes(), Charsets.UTF_8))
+                    // } catch (e: VirtualMachineException) {
+                    //     Log.d(TAG, "ASDF VM error", e)
+                    // }
                     resultReceiver.send(RESULT_ERROR, null)
                     stopSelf()
                     null
