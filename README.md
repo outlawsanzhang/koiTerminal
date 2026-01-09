@@ -38,3 +38,8 @@ How-Tos:
 * [Microdroid vendor modules](docs/microdroid_vendor_modules.md)
 * [Huge Pages](docs/hugepages.md)
 * [Shutdown](docs/shutdown.md)
+
+# Misc
+### License
+Icon from [public domain](https://freesvg.org/vector-clip-art-of-seamless-pattern-of-carp)
+
