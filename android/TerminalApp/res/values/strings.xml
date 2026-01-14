@@ -418,4 +418,9 @@
     <string name="upgrade_snkbar_error">Upgrade failed</string>
     <!-- Hint for mouse lock release -->
     <string name="mouse_lock_release_hint">Press Ctrl+Alt to release mouse lock</string>
+
+    <!-- From Termux... -->
+    <string name="termux_paste_text">Paste</string>
+    <string name="termux_copy_text">Copy</string>
+    <string name="termux_text_selection_more">More…</string>
 </resources>
