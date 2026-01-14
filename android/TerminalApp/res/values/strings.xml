@@ -210,4 +210,9 @@
     <string name="settings_graphics_acceleration_software_renderer">Software renderer</string>
     <!-- Hardware-based renderer [CHAR LIMIT=none] -->
     <string name="settings_graphics_acceleration_hardware_renderer">GPU-accelerated renderer</string>
+
+    <!-- From Termux... -->
+    <string name="termux_paste_text">Paste</string>
+    <string name="termux_copy_text">Copy</string>
+    <string name="termux_text_selection_more">More…</string>
 </resources>
