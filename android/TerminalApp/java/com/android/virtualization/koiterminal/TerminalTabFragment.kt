@@ -55,8 +55,9 @@ class TerminalTabFragment() : Fragment() {
         object : Runnable {
             override fun run() {
                 Log.e(TAG, "ttyd timeout")
-                // Let unhandled exception handler to handle this
-                throw Exception("ttyd timeout")
+                bootProgressView
+                    ?.findViewById<TextView>(R.id.boot_progress_text)
+                    ?.text = resources.getString(R.string.vm_creation_ttyd_timeout_message)
             }
         }
 
