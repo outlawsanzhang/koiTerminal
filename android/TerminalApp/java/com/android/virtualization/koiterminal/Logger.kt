@@ -161,6 +161,7 @@ class SerialIOManager(
         }
         val serialIn = serialIn as FileOutputStream
         val serialInPfd = ParcelFileDescriptor.dup(serialIn.getFD())
+        Log.i(tag, "serialInPfd = fd${serialInPfd.getFd()}")
         return serialInPfd
     }
 
