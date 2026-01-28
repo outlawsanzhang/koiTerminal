@@ -30,6 +30,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.ConditionVariable
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.os.SystemProperties
 import android.provider.Settings
 import android.util.DisplayMetrics
@@ -60,6 +61,7 @@ import java.net.URL
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import com.termux.terminal.TerminalSession
 
 public class MainActivity :
     BaseActivity(),
@@ -78,6 +80,8 @@ public class MainActivity :
     private lateinit var tabLayout: TabLayout
     private lateinit var terminalTabAdapter: TerminalTabAdapter
     private val terminalInfo = CompletableFuture<TerminalInfo>()
+    private var serialOut: ParcelFileDescriptor? = null
+    private var serialIn: ParcelFileDescriptor? = null
     private val terminalViewModel: TerminalViewModel by viewModels()
     private var isVmRunning = false
 
@@ -175,11 +179,28 @@ public class MainActivity :
         tabAddButton?.setOnClickListener { addTerminalTab() }
     }
 
-    private fun addTerminalTab() {
+    private fun createTerminalSerialTabFragment(outReadingPfd: ParcelFileDescriptor, inWritingPfd: ParcelFileDescriptor): TerminalSerialTabFragment {
+        return TerminalSerialTabFragment().also {
+            val session = TerminalSession(outReadingPfd, inWritingPfd, 10240, it.asSessionClient()) // FIXME: hard-coded number of buffer lines
+            it.attachSession(session)
+        }
+    }
+
+    private fun addTerminalTab(mode: Int = TerminalTabAdapter.MODE_TTYD) {
+        // Only one serial tab possible
+        val tabId = when (mode) {
+            TerminalTabAdapter.MODE_SERIAL -> {
+                if (terminalTabAdapter.hasSerial() || serialOut == null || serialIn == null) return
+                terminalTabAdapter.addSerialTab(createTerminalSerialTabFragment(serialOut!!, serialIn!!))
+            }
+            TerminalTabAdapter.MODE_TTYD -> {
+                terminalTabAdapter.addTab()
+            }
+            else -> return
+        }
         val tab = tabLayout.newTab()
         tab.setCustomView(R.layout.tabitem_terminal)
         viewPager.offscreenPageLimit += 1
-        val tabId = terminalTabAdapter.addTab()
         terminalViewModel.selectedTabViewId = tabId
         terminalViewModel.terminalTabs[tabId] = tab
         tab.customView!!
@@ -243,12 +264,17 @@ public class MainActivity :
         )
     }
 
+    fun fontSize(): Float {
+        val config = resources.configuration
+        return config.fontScale * FONT_SIZE_DEFAULT
+    }
+
     private fun getTerminalServiceUrl(ipAddress: String?, port: Int): URL? {
         val config = resources.configuration
         // TODO: Always enable screenReaderMode (b/395845063)
         val query =
             ("?fontSize=" +
-                (config.fontScale * FONT_SIZE_DEFAULT).toInt() +
+                fontSize().toInt() +
                 "&fontWeight=" +
                 (FontStyle.FONT_WEIGHT_NORMAL + config.fontWeightAdjustment) +
                 "&fontWeightBold=" +
@@ -303,6 +329,13 @@ public class MainActivity :
         terminalInfo.complete(info)
     }
 
+    override fun onSerialAvailable(outReadingPfd: ParcelFileDescriptor, inWritingPfd: ParcelFileDescriptor) {
+        // TODO: pass info whether serialOut needs to be closed
+        serialOut = outReadingPfd
+        serialIn = inWritingPfd
+        Log.i(TAG, "onSerialAvailable(), serialOut = fd${serialOut?.getFd()}, serialIn = fd${serialIn?.getFd()}")
+    }
+
     override fun onVmShuttingDown() {
         Log.i(TAG, "onVmShuttingDown()")
         isVmRunning = false
@@ -323,7 +356,9 @@ public class MainActivity :
 
     override fun onAccessibilityStateChanged(enabled: Boolean) {
         terminalViewModel.terminalTabFragments.forEach { terminalFragment ->
-            connectToTerminalService(terminalFragment)
+            (terminalFragment as? TerminalTabFragment)?.let {
+                connectToTerminalService(it)
+            }
         }
     }
 

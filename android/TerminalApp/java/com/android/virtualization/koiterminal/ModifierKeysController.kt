@@ -22,11 +22,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 
+// Controls modifier keys and messes with tab focus
 class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) {
     private val window = activity.window
     private val keysSingleLine: View
     private val keysDoubleLine: View
-    private var activeTerminalView: TerminalView? = null
+    private var activeTerminalView: View? = null
     private var keysInSingleLine: Boolean = false
 
     init {
@@ -50,13 +51,13 @@ class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) 
         }
     }
 
-    fun addTerminalView(terminalView: TerminalView) {
+    fun addTerminalView(terminalView: View) {
         terminalView.setOnFocusChangeListener { _: View, onFocus: Boolean ->
             if (onFocus) {
                 activeTerminalView = terminalView
             } else {
                 activeTerminalView = null
-                terminalView.disableCtrlKey()
+                (terminalView as? TerminalView)?.disableCtrlKey()
             }
             update()
         }
@@ -67,8 +68,10 @@ class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) 
         keys
             .findViewById<View>(R.id.btn_ctrl)
             .setOnClickListener({
-                activeTerminalView!!.mapCtrlKey()
-                activeTerminalView!!.enableCtrlKey()
+                (activeTerminalView as? TerminalView)?.let {
+                    it!!.mapCtrlKey()
+                    it!!.enableCtrlKey()
+                }
             })
 
         val listener =
