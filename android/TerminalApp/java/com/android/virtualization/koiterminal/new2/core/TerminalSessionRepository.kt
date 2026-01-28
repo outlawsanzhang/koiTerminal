@@ -15,9 +15,12 @@
  */
 package com.android.virtualization.koiterminal.new2.core
 
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 
 /**
  * Single source of truth for terminal sessions. Manages the list of active sessions and the
@@ -30,13 +33,25 @@ object TerminalSessionRepository {
     private val _selectedSessionId = MutableStateFlow(_sessions.value.first().id)
     val selectedSessionId: StateFlow<String> = _selectedSessionId.asStateFlow()
 
-    /** Adds a new terminal session and selects it. */
-    fun addSession() {
-        val newSession = TerminalSession()
+    private val _selectedSessionIndex = MutableStateFlow(0)
+    val selectedSessionIndex: StateFlow<Int> = _selectedSessionIndex.asStateFlow()
+    val selectedSession = _sessions.combine(_selectedSessionIndex) { sessions, index ->
+        sessions.getOrNull(index)
+    }
+
+    /** Adds a new terminal session and selects it. Returns false if skipped. */
+    fun addSession(type: TerminalSessionType = TerminalSessionType.TTYD): Boolean {
+        if (type == TerminalSessionType.SERIAL && _sessions.value.any { it.type == TerminalSessionType.SERIAL }) {
+            // only one SERIAL session at a time
+            return false
+        }
+        val newSession = TerminalSession(type = type)
         val currentList = _sessions.value.toMutableList()
         currentList.add(newSession)
         _sessions.value = currentList
         _selectedSessionId.value = newSession.id
+        _selectedSessionIndex.value = currentList.size - 1
+        return true
     }
 
     /** Removes a session by ID. If it was selected, selects another one. */
@@ -52,16 +67,21 @@ object TerminalSessionRepository {
             return
         }
 
-        if (_selectedSessionId.value == id) {
+        if (_selectedSessionIndex.value == index) {
             val newIndex = if (index > 0) index - 1 else 0
             _selectedSessionId.value = currentList[newIndex].id
+            _selectedSessionIndex.value = newIndex
+        } else if (_selectedSessionIndex.value > index) {
+            _selectedSessionIndex.value -= 1
         }
     }
 
     /** Selects a session by ID. */
     fun selectSession(id: String) {
-        if (_sessions.value.any { it.id == id }) {
+        val index =_sessions.value.indexOfFirst { it.id == id }
+        if (index != -1) {
             _selectedSessionId.value = id
+            _selectedSessionIndex.value = index
         }
     }
 
@@ -70,5 +90,6 @@ object TerminalSessionRepository {
         val newSession = TerminalSession()
         _sessions.value = listOf(newSession)
         _selectedSessionId.value = newSession.id
+        _selectedSessionIndex.value = 0
     }
 }

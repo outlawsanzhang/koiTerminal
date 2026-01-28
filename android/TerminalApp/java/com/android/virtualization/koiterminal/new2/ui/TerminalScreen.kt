@@ -15,6 +15,8 @@
  */
 package com.android.virtualization.koiterminal.new2.ui
 
+import android.os.ParcelFileDescriptor
+import android.util.Log
 import android.view.KeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -69,9 +71,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.virtualization.koiterminal.R
 import com.android.virtualization.koiterminal.new2.core.TerminalAddress
 import com.android.virtualization.koiterminal.new2.core.TerminalSession
+import com.android.virtualization.koiterminal.new2.core.TerminalSessionType
+import com.android.virtualization.koiterminal.new2.core.TtyView
+import com.android.virtualization.koiterminal.new2.core.TtydView
+import com.android.virtualization.koiterminal.new2.core.TtySView
 import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
 import com.android.virtualization.koiterminal.new2.ui.main.TerminalUiState
 import com.android.virtualization.koiterminal.new2.ui.main.TerminalViewModel
+import kotlinx.coroutines.flow.map
 
 val TAB_BAR_HEIGHT = 50.dp
 
@@ -237,13 +244,28 @@ private fun TerminalTab(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TerminalScreen(terminalAddress: TerminalAddress, tabId: String, mainViewModel: MainViewModel) {
+fun TerminalScreen(inWritingPfd: ParcelFileDescriptor?, outReadingPfd: ParcelFileDescriptor?, terminalAddress: TerminalAddress?, tabId: String, mainViewModel: MainViewModel) {
     val terminalViewModel: TerminalViewModel = viewModel(key = tabId)
-    val terminalUiState by terminalViewModel.uiState.collectAsStateWithLifecycle()
+    val terminalTtydUiState by terminalViewModel.uiState.collectAsStateWithLifecycle()
+    val tab = mainViewModel.selectedTab.collectAsStateWithLifecycle(null).value
+    val isSERIAL = tab?.type == TerminalSessionType.SERIAL
+    val terminalUiState = if (isSERIAL) TerminalUiState.Ready else terminalTtydUiState
+
     val ttydView =
-        remember(terminalAddress, tabId) {
-            terminalViewModel.getOrCreateTtydView(tabId, terminalAddress)
+        remember(terminalAddress, tab, tabId) {
+            val view: TtyView? = if (isSERIAL) {
+                if (inWritingPfd != null && outReadingPfd != null) {
+                    terminalViewModel.getOrCreateTtySView(tabId, inWritingPfd, outReadingPfd)
+                } else null
+            } else { // including tabType == null (empty tab list)
+                if (terminalAddress != null) {
+                    terminalViewModel.getOrCreateTtydView(tabId, terminalAddress)
+                } else null
+            }
+            view
         }
+    Log.d("TerminalScreen", "Composing TerminalScreen with isSERIAL=$isSERIAL tabs=${mainViewModel.tabs.collectAsStateWithLifecycle()} terminalUiState=$terminalUiState ttydView=$ttydView")
+    if (ttydView == null) return
 
     val storedImeVisibility by mainViewModel.isImeVisible.collectAsStateWithLifecycle()
     val isWindowImeVisible = WindowInsets.isImeVisible
@@ -256,7 +278,7 @@ fun TerminalScreen(terminalAddress: TerminalAddress, tabId: String, mainViewMode
     // 1. Sync ViewModel state to UI (Show/Hide Keyboard)
     LaunchedEffect(tabId, storedImeVisibility, terminalUiState) {
         if (terminalUiState is TerminalUiState.Ready) {
-            ttydView.post {
+            ttydView.asView().post {
                 if (storedImeVisibility) {
                     ttydView.showSoftInput()
                 } else {
@@ -274,7 +296,7 @@ fun TerminalScreen(terminalAddress: TerminalAddress, tabId: String, mainViewMode
             }
         },
         onKeyAction = { key, action ->
-            if (key == ExtraKey.CTRL) {
+            if (key == ExtraKey.CTRL && ttydView is TtydView) {
                 if (action == KeyEvent.ACTION_DOWN) {
                     ttydView.mapCtrlKey()
                     ttydView.enableCtrlKey()
@@ -282,8 +304,8 @@ fun TerminalScreen(terminalAddress: TerminalAddress, tabId: String, mainViewMode
             } else {
                 // Many terminal emulators send esc for alt for historical reason. We should
                 // do the same.
-                val code = if (key == ExtraKey.ALT) KeyEvent.KEYCODE_ESCAPE else key.keyCode
-                code?.let { ttydView.dispatchKeyEvent(KeyEvent(action, it)) }
+                val code = if (!isSERIAL && key == ExtraKey.ALT) KeyEvent.KEYCODE_ESCAPE else key.keyCode
+                code?.let { ttydView.asView().dispatchKeyEvent(KeyEvent(action, it)) }
             }
         },
     ) { stablePadding ->
@@ -300,17 +322,18 @@ fun TerminalScreen(terminalAddress: TerminalAddress, tabId: String, mainViewMode
                         }
                         AndroidView(
                             factory = {
-                                ttydView.apply {
+                                ttydView.asView().apply {
                                     setOnFocusChangeListener { _, hasFocus ->
                                         isFocused = hasFocus
-                                        if (!hasFocus) disableCtrlKey()
+                                        if (!hasFocus) (this as TtyView).disableCtrlKey()
+                                        if (hasFocus) (this as? TtySView)?.showSoftInput()
                                     }
                                 }
                             }
                         )
                     }
                 }
-                is TerminalUiState.Connecting -> {
+                TerminalUiState.Connecting -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
@@ -321,7 +344,7 @@ fun TerminalScreen(terminalAddress: TerminalAddress, tabId: String, mainViewMode
                         Text(text = stringResource(R.string.terminal_message_connecting))
                     }
                 }
-                is TerminalUiState.Disconnected -> {
+                TerminalUiState.Disconnected -> {
                     Text(text = stringResource(R.string.terminal_message_disconnected))
                 }
                 else -> {

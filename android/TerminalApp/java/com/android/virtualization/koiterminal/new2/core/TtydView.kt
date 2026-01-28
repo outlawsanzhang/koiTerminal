@@ -15,6 +15,8 @@
  */
 package com.android.virtualization.koiterminal.new2.core
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -25,6 +27,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.InputMethodManager
@@ -39,17 +42,42 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.android.virtualization.koiterminal.CertificateUtils
 import com.android.virtualization.koiterminal.TerminalView
+import com.termux.view.TerminalView as TermuxView
+import com.termux.terminal.TerminalEmulator
+import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalSessionClient
+import com.termux.view.TerminalViewClient
 import java.net.MalformedURLException
 import java.net.URL
 import java.security.cert.X509Certificate
 
-class TtydView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
-    TerminalView(context, attrs) {
+sealed interface TtyView {
+    var onTerminalReady: (() -> Unit)?
+    var onTerminalDisconnected: (() -> Unit)?
+    var onSessionDiscard: (() -> Unit)?
+    var onTitleChanged: ((String) -> Unit)?
+    fun showSoftInput()
+    fun hideSoftInput()
 
-    var onTerminalReady: (() -> Unit)? = null
-    var onTerminalDisconnected: (() -> Unit)? = null
-    var onSessionDiscard: (() -> Unit)? = null
-    var onTitleChanged: ((String) -> Unit)? = null
+    fun asView(): View =
+        when (this) {
+            is TtydView -> { this as View }
+            is TtySView -> { this as View }
+        }
+
+    fun terminalClose()
+    fun disableCtrlKey()
+    fun onResume()
+    fun onPause()
+}
+    
+class TtydView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+    TerminalView(context, attrs), TtyView {
+    override var onTerminalReady: (() -> Unit)? = null
+    override var onTerminalDisconnected: (() -> Unit)? = null
+    override var onSessionDiscard: (() -> Unit)? = null
+    override var onTitleChanged: ((String) -> Unit)? = null
+
     private var fontSize = (context.resources.configuration.fontScale * DEFAULT_FONT_SIZE).toInt()
 
     private val scaleGestureDetector =
@@ -187,14 +215,14 @@ class TtydView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         loadUrl(url.toString())
     }
 
-    fun showSoftInput() {
+    override fun showSoftInput() {
         if (requestFocus()) {
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showSoftInput(this, 0)
         }
     }
 
-    fun hideSoftInput() {
+    override fun hideSoftInput() {
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(windowToken, 0)
     }
@@ -354,3 +382,249 @@ class TtydView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         private const val MAX_FONT_SIZE = 200
     }
 }
+
+class TtySView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+    TermuxView(context, attrs), TtyView {
+    override var onTerminalReady: (() -> Unit)? = null
+    override var onTerminalDisconnected: (() -> Unit)? = null
+    override var onSessionDiscard: (() -> Unit)? = null
+    override var onTitleChanged: ((String) -> Unit)? = null
+
+    private var fontSizeInit: Float = context.resources.configuration.fontScale * DEFAULT_FONT_SIZE
+    private var fontSizeNow: Int = fontSizeInit.toInt()
+
+    init {
+        updateViewFontSize(fontSizeInit.toInt())
+        setDefaultFocusHighlightEnabled(false)
+        setFocusableInTouchMode(true)
+    }
+
+    private fun updateViewFontSize(size: Int) {
+        setTextSize(size) // initial font size, no scaling
+        fontSizeNow = size
+    }
+
+    override fun showSoftInput() {
+        if (requestFocus()) {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            if (context.resources.configuration.keyboard != Configuration.KEYBOARD_QWERTY) {
+                imm.showSoftInput(this, 0)
+            }
+        }
+    }
+
+    override fun hideSoftInput() {
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(windowToken, 0)
+    }
+
+    override public fun terminalClose() {
+        Log.d("TtydView", "terminalClose")
+        mTermSession.disconnectTerminal()
+    }
+
+    override fun disableCtrlKey() {}
+    override fun onResume() {}
+    override fun onPause() {}
+
+    fun asSessionClient(): SerialSessionClient {
+        return SerialSessionClient()
+    }
+
+    fun asViewClient(): SerialViewClient {
+        return SerialViewClient()
+    }
+
+    companion object {
+        const val TAG: String = "VmTerminalApp"
+        private const val DEFAULT_FONT_SIZE = 30
+        private const val MODKEY_UP = 0
+        private const val MODKEY_DOWN = 1
+        private const val MODKEY_VIRTUAL_HELD = 2
+        private const val MODKEY_MANUAL_HELD = 3
+    }
+    
+    // Serial session interface
+    inner class SerialSessionClient(): TerminalSessionClient {
+        override fun onTextChanged(changedSession: TerminalSession) {
+            onScreenUpdated()
+        }
+
+        override fun onTitleChanged(changedSession: TerminalSession) {
+            (this@TtySView).onTitleChanged?.invoke(changedSession.getTitle() ?: "")
+        }
+
+        override fun onSessionFinished(finishedSession: TerminalSession) {}
+
+        override fun onCopyTextToClipboard(session: TerminalSession, text: String?) {
+            if (text == null) return
+            val clipboard = getContext()?.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            if (clipboard == null) return
+            val clip: ClipData = ClipData.newPlainText("Termux copy text", text)
+            clipboard.setPrimaryClip(clip)
+        }
+
+        override fun onPasteTextFromClipboard(session: TerminalSession?) {
+            (getContext()?.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)
+                ?.primaryClip
+                ?.getItemAt(0)
+                ?.let {
+                    val text = it.coerceToText(getContext())
+                    if (!text.isEmpty()) mEmulator?.paste(text.toString());
+                }
+        }
+
+        override fun onBell(session: TerminalSession) {}
+
+        override fun onColorsChanged(session: TerminalSession) {}
+
+        override fun onTerminalCursorStateChange(state: Boolean) {}
+
+        override fun setTerminalShellPid(session: TerminalSession, pid: Int) {}
+
+
+
+        override fun getTerminalCursorStyle(): Int = TerminalEmulator.DEFAULT_TERMINAL_CURSOR_STYLE
+
+
+
+        override fun logError(tag: String, message: String) { Log.e(TAG, message) }
+
+        override fun logWarn(tag: String, message: String) { Log.w(TAG, message) }
+
+        override fun logInfo(tag: String, message: String) { Log.i(TAG, message) }
+
+        override fun logDebug(tag: String, message: String) { Log.d(TAG, message) }
+
+        override fun logVerbose(tag: String, message: String) { Log.v(TAG, message) }
+
+        override fun logStackTraceWithMessage(tag: String, message: String, e: Exception) { Log.e(TAG, message, e) }
+
+        override fun logStackTrace(tag: String, e: Exception) { Log.e(TAG, "$e", e) }
+    }
+
+    // Serial terminal view interface
+    inner class SerialViewClient(): TerminalViewClient {
+
+        public var isCtrlDown: Int = MODKEY_UP
+        public var isAltDown: Int = MODKEY_UP
+
+        /**
+         * Callback function on scale events according to {@link ScaleGestureDetector#getScaleFactor()}.
+         */
+        override fun onScale(scale: Float): Float {
+            val fontSizeNext = (fontSizeInit * scale).toInt()
+            if (fontSizeNow != fontSizeNext) {
+                updateViewFontSize(fontSizeNext)
+            }
+            return scale
+        }
+
+        /**
+         * On a single tap on the terminal if terminal mouse reporting not enabled.
+         */
+        override fun onSingleTapUp(e: MotionEvent) {
+            // Let the compose code handles the inconsistency
+            showSoftInput()
+        }
+
+        override fun shouldBackButtonBeMappedToEscape(): Boolean { return true }
+
+        override fun shouldEnforceCharBasedInput(): Boolean { return false } // TODO: make configurable
+
+        override fun shouldUseCtrlSpaceWorkaround(): Boolean { return false } // TODO: make configurable
+
+        override fun isTerminalViewSelected(): Boolean {
+            // FIXME: what to do here?
+            return isFocused()
+        }
+
+        override fun copyModeChanged(copyMode: Boolean) {} // on finish selecting text or deselecting
+
+        override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean {
+            if (keyCode == KeyEvent.KEYCODE_CTRL_LEFT) {
+                when (isCtrlDown) {
+                    MODKEY_UP, MODKEY_VIRTUAL_HELD -> isCtrlDown = MODKEY_DOWN
+                }
+            }
+            if (keyCode == KeyEvent.KEYCODE_ALT_LEFT) {
+                when (isAltDown) {
+                    MODKEY_UP, MODKEY_VIRTUAL_HELD -> isAltDown = MODKEY_DOWN
+                }
+            }
+            return false
+        }
+
+        override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean {
+            // This is called with hardware key presses and occasionally software (e.g. AOSP keyboard Enter and Backspace)
+            if (KeyEvent.isModifierKey(keyCode)) {
+                if (keyCode == KeyEvent.KEYCODE_CTRL_LEFT) {
+                    when (isCtrlDown) {
+                        MODKEY_DOWN -> isCtrlDown = MODKEY_VIRTUAL_HELD
+                        MODKEY_MANUAL_HELD -> isCtrlDown = MODKEY_UP
+                    }
+                }
+                if (keyCode == KeyEvent.KEYCODE_ALT_LEFT) {
+                    when (isAltDown) {
+                        MODKEY_DOWN -> isAltDown = MODKEY_VIRTUAL_HELD
+                        MODKEY_MANUAL_HELD -> isAltDown = MODKEY_UP
+                    }
+                }
+            } else {
+                // This cannot be put into onKeyDown because read*Key() is called after that.
+                onNonModifierKey()
+            }
+            return false
+        }
+
+        override fun onLongPress(event: MotionEvent): Boolean {
+            // No special handling
+            return false
+        }
+
+        override fun readControlKey(): Boolean { return isCtrlDown != MODKEY_UP }
+
+        override fun readAltKey(): Boolean { return isAltDown != MODKEY_UP }
+
+        // TODO: keys absent from virtual modifier keyboard
+
+        override fun readShiftKey(): Boolean { return false }
+
+        override fun readFnKey(): Boolean { return false }
+
+        override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean {
+            // This is called after read*Key() are called and logic processed.
+            onNonModifierKey()
+            return false
+        }
+
+        fun onNonModifierKey() {
+            // Clear button holding.
+            when (isCtrlDown) {
+                MODKEY_DOWN -> isCtrlDown = MODKEY_MANUAL_HELD
+                MODKEY_VIRTUAL_HELD -> isCtrlDown = MODKEY_UP
+            }
+            when (isAltDown) {
+                MODKEY_DOWN -> isAltDown = MODKEY_MANUAL_HELD
+                MODKEY_VIRTUAL_HELD -> isAltDown = MODKEY_UP
+            }
+        }
+
+        override fun onEmulatorSet() {}
+
+        override fun logError(tag: String, message: String) { Log.e(TAG, message) }
+
+        override fun logWarn(tag: String, message: String) { Log.w(TAG, message) }
+
+        override fun logInfo(tag: String, message: String) { Log.i(TAG, message) }
+
+        override fun logDebug(tag: String, message: String) { Log.d(TAG, message) }
+
+        override fun logVerbose(tag: String, message: String) { Log.v(TAG, message) }
+
+        override fun logStackTraceWithMessage(tag: String, message: String, e: Exception) { Log.e(TAG, message, e) }
+
+        override fun logStackTrace(tag: String, e: Exception) { Log.e(TAG, "$e", e) }
+    }
+}
+

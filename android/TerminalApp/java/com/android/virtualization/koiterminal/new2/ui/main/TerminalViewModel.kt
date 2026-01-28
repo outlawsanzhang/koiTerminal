@@ -18,15 +18,19 @@ package com.android.virtualization.koiterminal.new2.ui.main
 import android.app.Application
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.WindowManager.LayoutParams.TYPE_APPLICATION
 import androidx.lifecycle.AndroidViewModel
 import com.android.virtualization.koiterminal.R
 import com.android.virtualization.koiterminal.new2.core.TerminalAddress
+import com.android.virtualization.koiterminal.new2.core.TerminalSessionType
 import com.android.virtualization.koiterminal.new2.core.TtydView
+import com.android.virtualization.koiterminal.new2.core.TtySView
 import com.android.virtualization.koiterminal.new2.core.VmController
 import com.android.virtualization.koiterminal.new2.util.LoggingMutableStateFlow
+import com.termux.terminal.TerminalSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,6 +63,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         application.createDisplayContext(disp).createWindowContext(TYPE_APPLICATION, null)
     }
     private var ttydView: TtydView? = null
+    private var ttySView: TtySView? = null
 
     fun getOrCreateTtydView(sessionId: String, terminalAddress: TerminalAddress): TtydView {
         if (ttydView == null) {
@@ -76,9 +81,28 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         return ttydView!!
     }
 
+    fun getOrCreateTtySView(sessionId: String, inWritingPfd: ParcelFileDescriptor, outReadingPfd: ParcelFileDescriptor): TtySView {
+        if (ttySView == null) {
+            Log.d("TerminalViewModel", "Creating new TtySView")
+            ttySView = 
+                TtySView(context).apply {
+                    val session = TerminalSession(inWritingPfd, outReadingPfd, 10240, asSessionClient()) // FIXME: hard-coded number of buffer lines
+                    attachSession(session)
+                    setTerminalViewClient(asViewClient())
+                    onTerminalReady = { _uiState.value = TerminalUiState.Ready }
+                    onTerminalDisconnected = { _uiState.value = TerminalUiState.Disconnected }
+                    onSessionDiscard = { VmController.requestSessionDiscard(sessionId) }
+                    onTitleChanged = { title -> _title.value = title }
+                }
+        }
+        return ttySView!!
+    }
+
     fun terminalClose() {
         ttydView?.terminalClose()
         ttydView = null
+        ttySView?.terminalClose()
+        ttySView = null
     }
 
     override fun onCleared() {
@@ -86,5 +110,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         Log.d("TerminalViewModel", "Clearing TtydView")
         ttydView?.terminalClose()
         ttydView = null
+        ttySView?.terminalClose()
+        ttySView = null
     }
 }
