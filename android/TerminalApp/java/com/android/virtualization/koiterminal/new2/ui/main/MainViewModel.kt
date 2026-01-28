@@ -20,6 +20,8 @@ import android.app.Application
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.input.InputManager
+import android.os.ParcelFileDescriptor
+import android.util.Log
 import android.view.InputDevice
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +29,7 @@ import com.android.virtualization.koiterminal.new2.core.InstallState
 import com.android.virtualization.koiterminal.new2.core.Installer
 import com.android.virtualization.koiterminal.new2.core.TerminalAddress
 import com.android.virtualization.koiterminal.new2.core.TerminalSession
+import com.android.virtualization.koiterminal.new2.core.TerminalSessionType
 import com.android.virtualization.koiterminal.new2.core.TerminalSessionRepository
 import com.android.virtualization.koiterminal.new2.core.VmController
 import com.android.virtualization.koiterminal.new2.core.VmState
@@ -50,7 +53,7 @@ sealed interface MainUiState {
 
     data object Booting : MainUiState
 
-    data class Running(val terminalAddress: TerminalAddress) : MainUiState
+    data class Running(val outReadingPfd: ParcelFileDescriptor?, val inWritingPfd: ParcelFileDescriptor?, val terminalAddress: TerminalAddress?) : MainUiState
 
     data object Stopping : MainUiState
 
@@ -74,6 +77,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val tabs: StateFlow<List<TerminalSession>> = TerminalSessionRepository.sessions
     val selectedTabId: StateFlow<String> = TerminalSessionRepository.selectedSessionId
+    val selectedTab = TerminalSessionRepository.selectedSession
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            tabs.value.getOrNull(TerminalSessionRepository.selectedSessionIndex.value),
+        )
 
     private val _displayState = MutableStateFlow<DisplayState>(DisplayState.Hidden)
     val displayState: StateFlow<DisplayState> = _displayState.asStateFlow()
@@ -182,6 +191,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         TerminalSessionRepository.addSession()
     }
 
+    fun addSerialTab(): Boolean {
+        return TerminalSessionRepository.addSession(TerminalSessionType.SERIAL)
+    }
+
     fun closeTab(id: String) {
         TerminalSessionRepository.removeSession(id)
     }
@@ -207,7 +220,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         MainUiState.Booting
                     }
                     is VmState.Rebooting -> MainUiState.Booting
-                    is VmState.Running -> MainUiState.Running(vmState.terminalAddress)
+                    is VmState.Running -> MainUiState.Running(vmState.outReadingPfd, vmState.inWritingPfd, vmState.terminalAddress)
                     is VmState.Stopping -> MainUiState.Stopping
                     is VmState.Stopped -> {
                         if (hasVmEverStarted) {
@@ -345,6 +358,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         VmController.vmState.collect { state ->
                             if (state is VmState.Rebooting) {
                                 restartVm()
+                            } else if (state is VmState.Running && state.outReadingPfd != null && state.inWritingPfd != null && state.terminalAddress == null) {
+                                // When serial is ready but ttyd is not, try to add serial tab and then close current (ttyd) tab
+                                val currentTabId = TerminalSessionRepository.selectedSessionId.value
+                                if (addSerialTab()) {
+                                    closeTab(currentTabId)
+                                }
                             }
                         }
                     }

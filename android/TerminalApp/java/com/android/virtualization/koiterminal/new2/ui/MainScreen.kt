@@ -17,6 +17,7 @@ package com.android.virtualization.koiterminal.new2.ui
 
 import android.app.Activity
 import android.provider.Settings
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -216,7 +217,7 @@ fun RunningScreen(state: MainUiState.Running, viewModel: MainViewModel) {
                 key(isFullscreen) { DisplayScreen(viewModel = viewModel) }
             }
         } else {
-            TerminalScreen(state.terminalAddress, selectedTabId, viewModel)
+            TerminalScreen(state.outReadingPfd, state.inWritingPfd, state.terminalAddress, selectedTabId, viewModel)
         }
     }
 }
