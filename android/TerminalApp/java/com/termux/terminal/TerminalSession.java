@@ -49,6 +49,9 @@ public final class TerminalSession extends TerminalOutput {
     final ByteQueue mTerminalToProcessIOQueue = new ByteQueue(4096);
     /** Buffer to write translate code points into utf8 before writing to mTerminalToProcessIOQueue */
     private final byte[] mUtf8InputBuffer = new byte[5];
+    /** Threads that move IO to/from the console */
+    private Thread mInWriterThread;
+    private Thread mOutReaderThread;
 
     /** Callback which gets notified when a session finishes or changes title. */
     TerminalSessionClient mClient;
@@ -78,11 +81,8 @@ public final class TerminalSession extends TerminalOutput {
     }
 
     public void disconnectTerminal() {
-        try {
-            mSerialOutReadingFileDescriptor.close();
-        } catch (IOException e) {
-            Logger.logStackTraceWithMessage(mClient, LOG_TAG, "Error shutting down terminal output", e);
-        }
+        mInWriterThread.interrupt();
+        mOutReaderThread.interrupt();
     }
 
     /**
@@ -120,35 +120,46 @@ public final class TerminalSession extends TerminalOutput {
     public void initializeEmulator(int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
         mEmulator = new TerminalEmulator(this, columns, rows, cellWidthPixels, cellHeightPixels, mTranscriptRows, mClient);
 
-        new Thread("TermSessionInputReader") {
+        mOutReaderThread = new Thread("TermSessionInputReader") {
             @Override
             public void run() {
-                int sOutFd = mSerialOutReadingFileDescriptor.getFd();
+                // int sOutFd = mSerialOutReadingFileDescriptor.getFd();
                 int bytesRead = 0;
-                try (InputStream serialOut = new ParcelFileDescriptor.AutoCloseInputStream(mSerialOutReadingFileDescriptor)) {
+                try (InputStream serialOut = new FileInputStream(mSerialOutReadingFileDescriptor.getFileDescriptor())) {
                     final byte[] buffer = new byte[4096];
                     while (true) {
+                        if (Thread.interrupted()) return;
+                        if (serialOut.available() == 0) {
+                            Thread.sleep(1);
+                            continue;
+                        }
                         int read = serialOut.read(buffer);
                         if (read == -1) return;
                         bytesRead += read;
                         if (!mProcessToTerminalIOQueue.write(buffer, 0, read)) return;
                         mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
                     }
+                } catch (InterruptedException e) {
+                    // Ignore, just shutting down.
+                    Log.i(LOG_TAG, "TerminalSession: interrupted while reading terminal output", e);
                 } catch (Exception e) {
                     // Ignore, just shutting down.
                     Log.e(LOG_TAG, "TerminalSession: error reading terminal output", e);
                 }
             }
-        }.start();
+        };
+        mOutReaderThread.start();
 
-        new Thread("TermSessionOutputWriter") {
+        mInWriterThread = new Thread("TermSessionOutputWriter") {
             @Override
             public void run() {
                 final byte[] buffer = new byte[4096];
-                try (FileOutputStream serialIn = new ParcelFileDescriptor.AutoCloseOutputStream(mSerialInWritingFileDescriptor)) {
+                try (FileOutputStream serialIn = new FileOutputStream(mSerialInWritingFileDescriptor.getFileDescriptor())) {
                     while (true) {
+                        if (Thread.interrupted()) return;
                         int bytesToWrite = mTerminalToProcessIOQueue.read(buffer, true);
                         if (bytesToWrite == -1) return;
+                        // Log.i(LOG_TAG, "TerminalSession: writing " + bytesToWrite + " bytes of user input to terminal, " + HexFormat.ofDelimiter(" ").formatHex(buffer, 0, bytesToWrite));
                         serialIn.write(buffer, 0, bytesToWrite);
                     }
                 } catch (IOException e) {
@@ -156,8 +167,11 @@ public final class TerminalSession extends TerminalOutput {
                     Log.e(LOG_TAG, "TerminalSession: error writing input to the terminal", e);
                 }
             }
-        }.start();
+        };
+        mInWriterThread.start();
 
+        // Press Ctrl + L on start. FIXME: hardcoded
+        writeCodePoint(false, 'L' - 'A' + 1);
     }
 
     /** Write data to the shell process. */

@@ -126,6 +126,7 @@ class VmLauncherService : Service() {
                 startForeground(this.hashCode(), notification)
             }
             ACTION_SHUTDOWN_VM -> mainWorkerThread.execute({ doShutdown(resultReceiver) })
+            ACTION_QUERY_VM_SERIAL -> notifyIfSerialAvailable(resultReceiver)
             else -> {
                 Log.e(TAG, "Unknown command " + intent.action)
                 stopSelf()
@@ -204,17 +205,13 @@ class VmLauncherService : Service() {
             mbc.stop()
             resultReceiver.send(if (success) RESULT_STOP else RESULT_ERROR, null)
             serialIO?.flagForShutdown()
+            serialIO = null
             stopSelf()
         }
         serialIO = NoLogger.setup(this, virtualMachine, bgThreads)
 
         resultReceiver.send(RESULT_START, null) // this tells MainActivity.kt that VM has started.
-        if (serialIO != null) {
-            val bundle = Bundle()
-            bundle.putParcelable(KEY_TERMINAL_INWRITINGPFD, serialIO!!.getSerialInPfd())
-            bundle.putParcelable(KEY_TERMINAL_OUTREADINGPFD, serialIO!!.getSerialOutPfd())
-            resultReceiver.send(RESULT_SERIAL_AVAIL, bundle) // this tells MainActivity.kt the serial console in and out PFDs.
-        }
+        notifyIfSerialAvailable(resultReceiver)
 
         portNotifier = PortNotifier(this)
 
@@ -274,6 +271,16 @@ class VmLauncherService : Service() {
         val FIRST_VERSION_SUPPORTS_TTYD_VSOCK = 5106
         return Flags.terminalVmCommunicationRefactoring() &&
             buildId >= FIRST_VERSION_SUPPORTS_TTYD_VSOCK
+    }
+
+    private fun notifyIfSerialAvailable(resultReceiver: ResultReceiver?) {
+        if (serialIO != null && resultReceiver != null) {
+            // this tells MainActivity.kt the serial console in and out PFDs.
+            val bundle = Bundle()
+            bundle.putParcelable(KEY_TERMINAL_INWRITINGPFD, serialIO!!.getSerialInPfd())
+            bundle.putParcelable(KEY_TERMINAL_OUTREADINGPFD, serialIO!!.getSerialOutPfd())
+            resultReceiver.send(RESULT_SERIAL_AVAIL, bundle)
+        }
     }
 
     private fun getTerminalServiceInfo(timeout_secs: Int): CompletableFuture<NsdServiceInfo> {
@@ -428,6 +435,8 @@ class VmLauncherService : Service() {
                 resultReceiver?.send(if (success) RESULT_STOP else RESULT_ERROR, null)
             }
         }
+        serialIO?.flagForShutdown()
+        serialIO = null
         if (debianService != null && debianService!!.shutdownDebian()) {
             // During shutdown, change the notification content to indicate that it's closing
             val notification = createNotificationForTerminalClose()
@@ -488,6 +497,7 @@ class VmLauncherService : Service() {
         private const val EXTRA_DISPLAY_INFO = PREFIX + "EXTRA_DISPLAY_INFO"
 
         private const val ACTION_SHUTDOWN_VM: String = PREFIX + "ACTION_SHUTDOWN_VM"
+        private const val ACTION_QUERY_VM_SERIAL: String = PREFIX + "ACTION_QUERY_VM_SERIAL"
 
         private const val RESULT_START = 0
         private const val RESULT_STOP = 1
@@ -568,6 +578,12 @@ class VmLauncherService : Service() {
         fun getIntentForShutdown(context: Context, callback: VmLauncherServiceCallback): Intent {
             val i = prepareIntent(context, callback)
             i.setAction(ACTION_SHUTDOWN_VM)
+            return i
+        }
+        
+        fun getIntentForQuerySerial(context: Context, callback: VmLauncherServiceCallback): Intent {
+            val i = prepareIntent(context, callback)
+            i.setAction(ACTION_QUERY_VM_SERIAL)
             return i
         }
     }
