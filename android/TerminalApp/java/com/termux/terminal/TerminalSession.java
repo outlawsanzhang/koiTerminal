@@ -124,11 +124,13 @@ public final class TerminalSession extends TerminalOutput {
             public void run() {
                 int sOutFd = mSerialOutReadingFileDescriptor.getFd();
                 int bytesRead = 0;
+                // Log.i(LOG_TAG, "IO-check TerminalSession readFD = " + sOutFd + ": starting terminal output reader");
                 try (InputStream serialOut = new ParcelFileDescriptor.AutoCloseInputStream(mSerialOutReadingFileDescriptor)) {
                     final byte[] buffer = new byte[4096];
                     while (true) {
                         int read = serialOut.read(buffer);
                         if (read == -1) return;
+                        // Log.i(LOG_TAG, "IO-check TerminalSession readFD = " + sOutFd + ": writing " + read + " bytes of terminal output to display (" + bytesRead + " -> " + (bytesRead + read) + ")");
                         bytesRead += read;
                         if (!mProcessToTerminalIOQueue.write(buffer, 0, read)) return;
                         mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
@@ -143,11 +145,13 @@ public final class TerminalSession extends TerminalOutput {
         new Thread("TermSessionOutputWriter") {
             @Override
             public void run() {
+                Log.i(LOG_TAG, "TerminalSession: starting terminal input writer, mSerialInWritingFileDescriptor = fd" + mSerialInWritingFileDescriptor.getFd());
                 final byte[] buffer = new byte[4096];
                 try (FileOutputStream serialIn = new ParcelFileDescriptor.AutoCloseOutputStream(mSerialInWritingFileDescriptor)) {
                     while (true) {
                         int bytesToWrite = mTerminalToProcessIOQueue.read(buffer, true);
                         if (bytesToWrite == -1) return;
+                        // Log.i(LOG_TAG, "TerminalSession: writing " + bytesToWrite + " bytes of user input to terminal");
                         serialIn.write(buffer, 0, bytesToWrite);
                     }
                 } catch (IOException e) {
