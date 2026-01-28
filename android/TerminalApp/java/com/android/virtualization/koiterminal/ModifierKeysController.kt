@@ -22,12 +22,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import com.termux.view.TerminalView as TermuxTerminalView
+import com.android.virtualization.koiterminal.TerminalSerialTabFragment
 
+// Controls modifier keys and messes with tab focus
 class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) {
     private val window = activity.window
     private val keysSingleLine: View
     private val keysDoubleLine: View
-    private var activeTerminalView: TerminalView? = null
+    private var activeTerminalView: View? = null
     private var keysInSingleLine: Boolean = false
 
     init {
@@ -51,13 +54,13 @@ class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) 
         }
     }
 
-    fun addTerminalView(terminalView: TerminalView) {
+    fun addTerminalView(terminalView: View) {
         terminalView.setOnFocusChangeListener { _: View, onFocus: Boolean ->
             if (onFocus) {
                 activeTerminalView = terminalView
             } else {
                 activeTerminalView = null
-                terminalView.disableCtrlKey()
+                (terminalView as? TerminalView)?.disableCtrlKey()
             }
             update()
         }
@@ -68,15 +71,40 @@ class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) 
         keys
             .findViewById<View>(R.id.btn_ctrl)
             .setOnClickListener({
-                activeTerminalView!!.mapCtrlKey()
-                activeTerminalView!!.enableCtrlKey()
+                val atv = activeTerminalView
+                when (atv) {
+                    is TerminalView -> {
+                        atv.mapCtrlKey()
+                        atv.enableCtrlKey()
+                    }
+                    is TermuxTerminalView -> {
+                        // Ctrl special treatment for serial console
+                        val keyStateInterface = atv.mClient as TerminalSerialTabFragment.SerialViewClient
+                        keyStateInterface?.isCtrlDown = true
+                    }
+                }
             })
 
         val listener =
             View.OnClickListener { v: View ->
                 BTN_KEY_CODE_MAP[v.id]?.also { keyCode ->
-                    activeTerminalView!!.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-                    activeTerminalView!!.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                    val atv = activeTerminalView
+                    when (atv) {
+                        is TerminalView -> {
+                            atv.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                            atv.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                        }
+                        is TermuxTerminalView -> {
+                            val keyStateInterface = atv.mClient as TerminalSerialTabFragment.SerialViewClient
+                            if (v.id == R.id.btn_alt) {
+                                // Alt special treatment for serial console
+                                keyStateInterface?.isAltDown = true
+                            } else {
+                                atv.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                                atv.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                            }
+                        }
+                    }
                 }
             }
 

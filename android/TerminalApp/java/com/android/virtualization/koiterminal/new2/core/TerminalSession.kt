@@ -17,4 +17,9 @@ package com.android.virtualization.koiterminal.new2.core
 
 import java.util.UUID
 
-data class TerminalSession(val id: String = UUID.randomUUID().toString())
+enum class TerminalSessionType {
+    TTYD,
+    SERIAL,
+}
+
+data class TerminalSession(val id: String = UUID.randomUUID().toString(), val type: TerminalSessionType = TerminalSessionType.TTYD)

@@ -16,12 +16,16 @@
 package com.android.virtualization.koiterminal
 
 import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.system.virtualmachine.VirtualMachine
 import android.system.virtualmachine.VirtualMachineConfig
+import android.system.virtualmachine.VirtualMachineException
 import android.util.Log
 import androidx.annotation.WorkerThread
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -31,6 +35,7 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.time.LocalDateTime
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import libcore.io.Streams
@@ -39,13 +44,13 @@ import libcore.io.Streams
  * Forwards VM's console output to a file on the Android side, and VM's log output to Android logd.
  */
 internal object Logger {
-    fun setup(context: Context, vm: VirtualMachine, executor: ExecutorService) {
+    fun setup(context: Context, vm: VirtualMachine, executor: ExecutorService): SerialIOManager? {
         val tag = vm.name
         val dir = context.getFileStreamPath(vm.name + ".log").toPath()
 
         if (vm.config.debugLevel != VirtualMachineConfig.DEBUG_LEVEL_FULL) {
             Log.i(tag, "Logs are not captured. Non-debuggable VM.")
-            return
+            return null
         }
 
         if (Files.isRegularFile(dir)) {
@@ -55,19 +60,7 @@ internal object Logger {
         Files.createDirectories(dir)
         deleteOldLogs(dir, 10)
         val logPath = dir.resolve(LocalDateTime.now().toString() + ".txt")
-        val console = vm.getConsoleOutput()
-        val file = Files.newOutputStream(logPath, StandardOpenOption.CREATE)
-        executor.execute({
-            try {
-                console.use { console ->
-                    LineBufferedOutputStream(file).use { fileOutput ->
-                        Streams.copy(console, fileOutput)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(tag, "Failed to log console output. VM may be shutting down", e)
-            }
-        })
+        val serialIO = SerialIOManager(vm, executor, tag)
 
         val log = vm.getLogOutput()
         executor.execute({
@@ -79,6 +72,7 @@ internal object Logger {
                 }
             }
         })
+        return serialIO
     }
 
     // Called by ErrorActivity in another process.
@@ -139,5 +133,90 @@ internal object Logger {
             super.write(buf, off, len)
             (0 until len).firstOrNull { buf[off + it] == '\n'.code.toByte() }?.let { flush() }
         }
+    }
+}
+
+class SerialIOManager(
+    vm: VirtualMachine,
+    private val executor: ExecutorService,
+    private val tag: String
+) {
+    private val serialOutReadingStream = vm.getConsoleOutput()
+    private val serialInWritingStream = try { vm.getConsoleInput() } catch (e: VirtualMachineException) { null }
+    private val writingPfd = serialInStreamToPfd(serialInWritingStream)
+    private val readingPfd = serialOutStreamToPfd(serialOutReadingStream)
+    public fun getSerialInPfd() = writingPfd
+    public fun getSerialOutPfd() = readingPfd
+    @Volatile
+    private var shutdownFlagged = false
+
+    fun flagForShutdown() {
+        shutdownFlagged = true
+    }
+
+    fun serialInStreamToPfd(serialIn: OutputStream?): ParcelFileDescriptor? {
+        if (serialIn == null) {
+            Log.w(tag, "VM does not support serial serial console input. Ignoring input...")
+            return devNullWritingPfd()
+        }
+        val serialIn = serialIn as FileOutputStream
+        val serialInPfd = ParcelFileDescriptor.dup(serialIn.getFD())
+        return serialInPfd
+    }
+
+    fun devNullWritingPfd(): ParcelFileDescriptor {
+        val pipe = ParcelFileDescriptor.createPipe()
+        val readEnd = pipe[0]
+        val writeEnd = pipe[1]
+
+        executor.execute {
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            val readingStream = ParcelFileDescriptor.AutoCloseInputStream(readEnd)
+            try {
+                while (!shutdownFlagged) {
+                    val read = readingStream.read(buffer)
+                }
+            } catch (e: IOException) {
+                Log.w(tag, "Failed to discard VM serial console input.", e)
+            } finally {
+                readingStream.close()
+            }
+        }
+
+        return writeEnd
+    }
+
+    fun serialOutStreamToPfd(serialOut: InputStream?): ParcelFileDescriptor? {
+        if (serialOut == null) {
+            Log.w(tag, "VM does not support serial console output. Ignoring output...")
+            return devNullReadingPfd()
+        }
+        val serialOut = serialOut as FileInputStream
+        val serialOutPfd = ParcelFileDescriptor.dup(serialOut.getFD())
+        return serialOutPfd
+    }
+
+    fun devNullReadingPfd(): ParcelFileDescriptor {
+        val pipe = ParcelFileDescriptor.createPipe()
+        val readEnd = pipe[0]
+        return readEnd
+    }
+
+    companion object {
+        const val DEFAULT_BUFFER_SIZE = 4096
+    }
+}
+
+internal object NoLogger {
+    fun setup(context: Context, vm: VirtualMachine, executor: ExecutorService): SerialIOManager? {
+        val tag = vm.name
+
+        if (vm.config.debugLevel != VirtualMachineConfig.DEBUG_LEVEL_FULL) {
+            Log.i(tag, "Logs are not captured. Non-debuggable VM.")
+            return null
+        }
+
+        val serialIO = SerialIOManager(vm, executor, tag)
+        return serialIO
     }
 }
