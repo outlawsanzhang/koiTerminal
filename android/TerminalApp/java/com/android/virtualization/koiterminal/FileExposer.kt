@@ -105,7 +105,7 @@ class FileExposer : DocumentsProvider() {
         with(cursor.newRow()) {
             add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, documentId)
             val mime: String = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR
-                else MimeTypeMap.getFileExtensionFromUrl(fileName)?.let {
+                else MimeTypeMap.getFileExtensionFromUrl(fileName.replace(":", "-"))?.let {
                     MimeTypeMap.getSingleton().getMimeTypeFromExtension(it)
                 } ?: BIN_TYPE
             add(DocumentsContract.Document.COLUMN_MIME_TYPE, mime)
