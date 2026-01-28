@@ -15,11 +15,12 @@
  */
 package com.android.virtualization.koiterminal
 
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
 import com.google.android.material.tabs.TabLayout.Tab
 
 class TerminalViewModel : ViewModel() {
-    val terminalTabFragments: MutableSet<TerminalTabFragment> = mutableSetOf()
+    val terminalTabFragments: MutableSet<Fragment> = mutableSetOf()
     var selectedTabViewId: String? = null
     val terminalTabs: MutableMap<String, Tab> = mutableMapOf()
 }

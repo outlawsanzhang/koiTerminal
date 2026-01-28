@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package com.android.virtualization.koiterminal.new2.core
+import android.os.ParcelFileDescriptor
 
 data class TerminalAddress(val ipAddress: String, val port: Int, val key: String? = null)
 
@@ -22,7 +23,7 @@ sealed interface VmState {
 
     data object Starting : VmState
 
-    data class Running(val terminalAddress: TerminalAddress) : VmState
+    data class Running(val outReadingPfd: ParcelFileDescriptor?, val inWritingPfd: ParcelFileDescriptor?, val terminalAddress: TerminalAddress?) : VmState
 
     data object Rebooting : VmState
 

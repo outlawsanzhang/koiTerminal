@@ -30,10 +30,12 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Parcel
 import android.os.Parcelable
+import android.os.ParcelFileDescriptor
 import android.os.ResultReceiver
 import android.os.StatFs
 import android.os.SystemProperties
 import android.system.virtualmachine.VirtualMachine
+import android.system.virtualmachine.VirtualMachineConfig
 import android.system.virtualmachine.VirtualMachineCustomImageConfig
 import android.system.virtualmachine.VirtualMachineCustomImageConfig.AudioConfig
 import android.system.virtualmachine.VirtualMachineException
@@ -52,6 +54,8 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import com.android.virtualization.koiterminal.SerialIOManager
 
 class VmLauncherService : Service() {
     // Thread pool
@@ -62,6 +66,8 @@ class VmLauncherService : Service() {
 
     // TODO: using lateinit for some fields to avoid null
     private var virtualMachine: VirtualMachine? = null
+    val vm get() = virtualMachine
+    private var serialIO: SerialIOManager? = null
     private var server: Server? = null
     private var debianService: DebianServiceBase? = null
     private var portNotifier: PortNotifier? = null
@@ -72,6 +78,8 @@ class VmLauncherService : Service() {
         fun onVmStart()
 
         fun onTerminalAvailable(info: TerminalInfo)
+
+        fun onSerialAvailable(outReadingPfd: ParcelFileDescriptor, inWritingPfd: ParcelFileDescriptor)
 
         fun onVmShuttingDown()
 
@@ -183,18 +191,30 @@ class VmLauncherService : Service() {
             }
 
         val virtualMachine = runner!!.vm
+        this.virtualMachine = virtualMachine
         val mbc = MemBalloonController(this, virtualMachine)
         mbc.start()
 
-        runner!!.shutdownStarted.thenAcceptAsync { resultReceiver.send(RESULT_SHUTTING_DOWN, null) }
+        runner!!.shutdownStarted.thenAcceptAsync {
+            resultReceiver.send(RESULT_SHUTTING_DOWN, null) 
+            serialIO?.flagForShutdown()
+            serialIO = null
+        }
         runner!!.exitStatus.thenAcceptAsync { success: Boolean ->
             mbc.stop()
             resultReceiver.send(if (success) RESULT_STOP else RESULT_ERROR, null)
+            serialIO?.flagForShutdown()
             stopSelf()
         }
-        Logger.setup(this, virtualMachine, bgThreads)
+        serialIO = NoLogger.setup(this, virtualMachine, bgThreads)
 
-        resultReceiver.send(RESULT_START, null)
+        resultReceiver.send(RESULT_START, null) // this tells MainActivity.kt that VM has started.
+        if (serialIO != null) {
+            val bundle = Bundle()
+            bundle.putParcelable(KEY_TERMINAL_INWRITINGPFD, serialIO!!.getSerialInPfd())
+            bundle.putParcelable(KEY_TERMINAL_OUTREADINGPFD, serialIO!!.getSerialOutPfd())
+            resultReceiver.send(RESULT_SERIAL_AVAIL, bundle) // this tells MainActivity.kt the serial console in and out PFDs.
+        }
 
         portNotifier = PortNotifier(this)
 
@@ -474,10 +494,13 @@ class VmLauncherService : Service() {
         private const val RESULT_ERROR = 2
         private const val RESULT_TERMINAL_AVAIL = 3
         private const val RESULT_SHUTTING_DOWN = 4
+        private const val RESULT_SERIAL_AVAIL = 10
 
         private const val KEY_TERMINAL_IPADDRESS = "address"
         private const val KEY_TERMINAL_PORT = "port"
         private const val KEY_TERMINAL_KEY = "terminal_key"
+        private const val KEY_TERMINAL_INWRITINGPFD = "serial_in_writing_pfd"
+        private const val KEY_TERMINAL_OUTREADINGPFD = "serial_out_reading_pfd"
 
         private const val SHUTDOWN_TIMEOUT_SECONDS = 3L
 
@@ -499,6 +522,11 @@ class VmLauncherService : Service() {
                     override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
                         when (resultCode) {
                             RESULT_START -> callback.onVmStart()
+                            RESULT_SERIAL_AVAIL -> {
+                                val inWritingPfd = resultData!!.getParcelable(KEY_TERMINAL_INWRITINGPFD, ParcelFileDescriptor::class.java)!!
+                                val outReadingPfd = resultData!!.getParcelable(KEY_TERMINAL_OUTREADINGPFD, ParcelFileDescriptor::class.java)!!
+                                callback.onSerialAvailable(outReadingPfd, inWritingPfd)
+                            }
                             RESULT_TERMINAL_AVAIL -> {
                                 Log.i(TAG, "received result RESULT_TERMINAL_AVAIL")
                                 val ipAddress = resultData!!.getString(KEY_TERMINAL_IPADDRESS)

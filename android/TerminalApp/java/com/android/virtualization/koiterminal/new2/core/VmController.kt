@@ -38,7 +38,7 @@ import com.android.virtualization.koiterminal.ConfigJson
 import com.android.virtualization.koiterminal.GraphicsManager
 import com.android.virtualization.koiterminal.InstalledImage
 import com.android.virtualization.koiterminal.InstalledImage.Companion.roundUp
-import com.android.virtualization.koiterminal.Logger
+import com.android.virtualization.koiterminal.NoLogger
 import com.android.virtualization.koiterminal.TerminalThreadFactory
 import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
 import com.android.virtualization.koiterminal.new2.util.LoggingMutableStateFlow
@@ -61,11 +61,13 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.android.virtualization.koiterminal.SerialIOManager
 
 object VmController {
     private val TAG = "VmController"
 
     private lateinit var context: Context
+    private var serialIO: SerialIOManager? = null
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _vmState = LoggingMutableStateFlow<VmState>(MutableStateFlow(VmState.Ready), TAG)
     val vmState: StateFlow<VmState> = _vmState.asStateFlow()
@@ -234,10 +236,6 @@ object VmController {
                     // Ignore if VM doesn't exist
                 }
 
-                val vm = vmm.create(vmName, config)
-                virtualMachine = vm
-                Logger.setup(context, vm, Executors.newSingleThreadExecutor())
-
                 val callback =
                     object : VirtualMachineCallback {
                         override fun onPayloadStarted(vm: VirtualMachine) {}
@@ -296,8 +294,34 @@ object VmController {
                         }
                     }
 
-                vm.setCallback(Executors.newSingleThreadExecutor(), callback)
-                vm.run()
+                try {
+                    val vm = vmm.create(vmName, config)
+                    virtualMachine = vm
+                    vm.setCallback(Executors.newSingleThreadExecutor(), callback)
+                    vm.run()
+                } catch (e: VirtualMachineException) {
+                    // Check for denied Network permission (on GrapheneOS)
+                    val serviceSpecificException = e.cause
+                    if (serviceSpecificException?.message?.contains(Regex("""does not have the android\.permission\.INTERNET permission""")) == true) {
+                        // Override network to false
+                        customImageConfigBuilder.useNetwork(false)
+                        configBuilder.setCustomImageConfig(customImageConfigBuilder.build())
+                        val config = configBuilder.build()
+                        // try again
+                        val vm = vmm.create(vmName, config)
+                        virtualMachine = vm
+                        vm.setCallback(Executors.newSingleThreadExecutor(), callback)
+                        vm.run()
+                    } else {
+                        throw e
+                    }
+                }
+
+                // Logger.setup(context, vm, Executors.newSingleThreadExecutor())
+                serialIO = NoLogger.setup(context, virtualMachine!!, Executors.newSingleThreadExecutor())
+                val outReadingPfd = serialIO?.getSerialOutPfd()
+                val inWritingPfd = serialIO?.getSerialInPfd()
+                Log.i("VmController", "inWritingPfd=${inWritingPfd?.getFd()} outReadingPfd=${outReadingPfd?.getFd()}")
 
                 if (canUseTtydOverVsock()) {
                     Log.i(TAG, "Connect to ttyd using vsock")
@@ -309,8 +333,12 @@ object VmController {
                     } else {
                         Log.d(TAG, "localhost is running with port=" + port)
                         _vmState.value =
-                            VmState.Running(TerminalAddress("localhost", port, bridge.secretKey))
+                            VmState.Running(outReadingPfd, inWritingPfd, TerminalAddress("localhost", port, bridge.secretKey))
                     }
+                } else if (outReadingPfd != null && inWritingPfd != null) {
+                    Log.d(TAG, "VM considered running once serial IO is ready: $outReadingPfd, $inWritingPfd")
+                    _vmState.value =
+                        VmState.Running(outReadingPfd, inWritingPfd, null)
                 }
 
                 val timeout = json.getBootTimeoutSecs() ?: 60
@@ -420,7 +448,14 @@ object VmController {
                                 .hostAddress!!
                         val port = info.port
 
-                        _vmState.value = VmState.Running(TerminalAddress(ipAddress, port))
+                        when (val it = _vmState.value) {
+                            is VmState.Running -> {
+                                _vmState.value = VmState.Running(it.outReadingPfd, it.inWritingPfd, TerminalAddress(ipAddress, port))
+                            }
+                            else -> {
+                                _vmState.value = VmState.Running(null, null, TerminalAddress(ipAddress, port))
+                            }
+                        }
                     }
                 }
             }

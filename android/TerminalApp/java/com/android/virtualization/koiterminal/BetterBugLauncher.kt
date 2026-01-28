@@ -23,6 +23,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.core.content.FileProvider
+import com.android.virtualization.koiterminal.ErrorActivity.Companion.start
 import com.android.virtualization.koiterminal.InstalledImage.Companion.getDefault
 import java.lang.Exception
 import java.nio.file.Files
@@ -46,7 +47,12 @@ class BetterBugLauncher {
             val bugReport = collectBugReport(activity, error)
             activity.runOnUiThread({
                 mainWorkerThread = null
-                launchBetterBugActivityInternal(activity, bugReport)
+                try {
+                    launchBetterBugActivityInternal(activity, bugReport)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Bugreport filing cannot be completed. Launching ErrorActivity.", error)
+                    ErrorActivity.start(activity, error ?: e)
+                }
             })
         })
 

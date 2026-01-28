@@ -21,14 +21,19 @@ import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import java.util.UUID
 
-class TabMetadata(val id: String)
+class TabMetadata(val id: String, val mode: Int)
 
 class TerminalTabAdapter(fragmentActivity: FragmentActivity) :
     FragmentStateAdapter(fragmentActivity) {
     val tabs = ArrayList<TabMetadata>()
+    private var terminalSerialTabFragment: TerminalSerialTabFragment? = null
 
     override fun createFragment(position: Int): Fragment {
-        val terminalTabFragment = TerminalTabFragment()
+        val terminalTabFragment = if (tabs[position].mode == MODE_TTYD) {
+            TerminalTabFragment()
+        } else {
+            terminalSerialTabFragment!!
+        }
 
         val args = Bundle()
         args.putString("id", tabs[position].id)
@@ -48,20 +53,41 @@ class TerminalTabAdapter(fragmentActivity: FragmentActivity) :
         return tabs.any { it.id.hashCode().toLong() == itemId }
     }
 
+    fun hasSerial(): Boolean {
+        return tabs.any { it.mode == MODE_SERIAL }
+    }
+
     fun addTab(): String {
         val id = UUID.randomUUID().toString()
-        tabs.add(TabMetadata(id))
+        tabs.add(TabMetadata(id, MODE_TTYD))
+        return id
+    }
+
+    fun addSerialTab(serial: TerminalSerialTabFragment): String {
+        val id = UUID.randomUUID().toString()
+        assert(!hasSerial())
+        terminalSerialTabFragment = serial
+        tabs.add(TabMetadata(id, MODE_SERIAL))
         return id
     }
 
     fun deleteTab(id: String): Boolean {
         for (i in 0 until tabs.size) {
             if (tabs[i].id == id) {
+                if (tabs[i].mode == MODE_SERIAL) {
+                    terminalSerialTabFragment?.disconnectTerminal()
+                    terminalSerialTabFragment = null
+                }
                 tabs.removeAt(i)
                 notifyItemRemoved(i)
                 return true
             }
         }
         return false
+    }
+
+    companion object {
+        public const val MODE_TTYD = 0
+        public const val MODE_SERIAL = 1
     }
 }
