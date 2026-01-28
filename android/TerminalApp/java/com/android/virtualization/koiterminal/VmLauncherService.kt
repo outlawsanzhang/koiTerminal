@@ -97,6 +97,8 @@ class VmLauncherService : Service() {
         fun onVmStop()
 
         fun onVmError()
+        
+        fun onTtydTimeout()
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -291,9 +293,13 @@ class VmLauncherService : Service() {
             )
             .exceptionallyAsync(
                 { e ->
-                    Log.e("$TAG-VmLauncherService", "Failed to start VM", e)
-                    resultReceiver.send(RESULT_ERROR, null)
-                    stopSelf()
+                    Log.e("$TAG-VmLauncherService", "Failed to start VM, caused by ${e.cause}", e)
+                    if (e.cause is TimeoutException) {
+                        resultReceiver.send(RESULT_TTYD_TIMEOUT, null)
+                    } else {
+                        resultReceiver.send(RESULT_ERROR, null)
+                        stopSelf()
+                    }
                     null
                 },
                 bgThreads,
@@ -340,7 +346,9 @@ class VmLauncherService : Service() {
             },
         )
 
-        resolvedInfo.orTimeout(timeout_secs.toLong(), TimeUnit.SECONDS)
+        if (timeout_secs > 0) {
+            resolvedInfo.orTimeout(timeout_secs.toLong(), TimeUnit.SECONDS)
+        }
         return resolvedInfo
     }
 
@@ -566,6 +574,7 @@ class VmLauncherService : Service() {
         private const val RESULT_TERMINAL_AVAIL = 3
         private const val RESULT_SHUTTING_DOWN = 4
         private const val RESULT_SERIAL_AVAIL = 10
+        private const val RESULT_TTYD_TIMEOUT = 11
 
         private const val KEY_TERMINAL_IPADDRESS = "address"
         private const val KEY_TERMINAL_PORT = "port"
@@ -607,6 +616,7 @@ class VmLauncherService : Service() {
                             RESULT_SHUTTING_DOWN -> callback.onVmShuttingDown()
                             RESULT_STOP -> callback.onVmStop()
                             RESULT_ERROR -> callback.onVmError()
+                            RESULT_TTYD_TIMEOUT -> callback.onTtydTimeout()
                             else -> Log.e(TAG, "unknown result code: " + resultCode)
                         }
                     }
