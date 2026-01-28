@@ -48,6 +48,7 @@ internal data class ConfigJson(
     private val platform_version: String?,
     private val memory_mib: Int = 1024,
     private val console_input_device: String?,
+    private val console_in: Boolean,
     private val bootloader: String?,
     private val kernel: String?,
     private val initrd: String?,
@@ -92,6 +93,7 @@ internal data class ConfigJson(
             .setCustomImageConfig(toCustomImageConfigBuilder(context).build())
             .setDebugLevel(getDebugLevel())
             .setVmOutputCaptured(console_out)
+            .setVmConsoleInputSupported(console_in)
             .setConnectVmConsole(connect_console)
     }
 
