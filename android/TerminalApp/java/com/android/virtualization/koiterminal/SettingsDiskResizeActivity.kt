@@ -22,6 +22,7 @@ import android.icu.text.NumberFormat
 import android.icu.util.Measure
 import android.icu.util.MeasureUnit
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.os.storage.StorageManager.UUID_DEFAULT
 import android.text.SpannableString
@@ -176,6 +177,8 @@ class SettingsDiskResizeActivity : AppCompatActivity() {
                 this,
                 object : VmLauncherServiceCallback {
                     override fun onVmStart() {}
+
+                    override fun onSerialAvailable(outReadingPfd: ParcelFileDescriptor, inWritingPfd: ParcelFileDescriptor) {}
 
                     override fun onTerminalAvailable(info: TerminalInfo) {}
 
