@@ -194,9 +194,11 @@ class SerialIOManager(
         val pipe = ParcelFileDescriptor.createPipe()
         val readEnd = pipe[0]
         val writeEnd = pipe[1]
+        Log.i(tag, "IO-check newOutSplitPipe: createPipe, readEnd = fd${readEnd.getFd()}, writeEnd = fd${writeEnd.getFd()}")
 
         executor.execute {
             try {
+                Log.i(tag, "IO-check newOutSplitPipe: start executor")
                 val writingStream = ParcelFileDescriptor.AutoCloseOutputStream(writeEnd)
                 var index = 0
                 var skipLog = false
@@ -206,6 +208,7 @@ class SerialIOManager(
                     cacheLock.readLock().lock()
                     // Follow new content
                     if (cache.size > index) {
+                        // Log.i(tag, "IO-check newOutSplitPipe readEnd = fd${readEnd.getFd()}: cache.size = ${cache.size}, index = $index")
                         dataToWrite = cache.subList(index, cache.size).toByteArray()
                         index = cache.size
                     }
@@ -241,6 +244,7 @@ class SerialIOManager(
         }
         val serialIn = serialIn as FileOutputStream
         val serialInPfd = ParcelFileDescriptor.dup(serialIn.getFD())
+        Log.i(tag, "serialInPfd = fd${serialInPfd.getFd()}")
         return serialInPfd
     }
 
