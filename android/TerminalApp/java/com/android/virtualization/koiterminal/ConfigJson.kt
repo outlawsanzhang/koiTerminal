@@ -21,6 +21,7 @@ import android.os.Environment
 import android.system.virtualmachine.VirtualMachineConfig
 import android.system.virtualmachine.VirtualMachineCustomImageConfig
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.WindowManager
 import com.android.virtualization.koiterminal.ConfigJson.AudioJson
 import com.android.virtualization.koiterminal.ConfigJson.DiskJson
@@ -85,6 +86,7 @@ internal data class ConfigJson(
 
     /** Converts this parsed JSON into VirtualMachineConfig Builder */
     fun toConfigBuilder(context: Context): VirtualMachineConfig.Builder {
+        Log.i("ConfigJson.toConfigBuilder", "this = ${this.toString()}")
         return VirtualMachineConfig.Builder(context)
             .setProtectedVm(isProtected)
             .setMemoryBytes(memory_mib.toLong() * 1024 * 1024)
