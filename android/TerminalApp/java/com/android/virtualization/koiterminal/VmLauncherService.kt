@@ -293,10 +293,10 @@ class VmLauncherService : Service() {
             )
             .exceptionallyAsync(
                 { e ->
-                    Log.e("$TAG-VmLauncherService", "Failed to start VM, caused by ${e.cause}", e)
                     if (e.cause is TimeoutException) {
                         resultReceiver.send(RESULT_TTYD_TIMEOUT, null)
                     } else {
+                        Log.e("$TAG-VmLauncherService", "Failed to start VM, caused by ${e.cause}", e)
                         resultReceiver.send(RESULT_ERROR, null)
                         stopSelf()
                     }

@@ -16,6 +16,7 @@
 package com.android.virtualization.koiterminal
 
 import android.content.res.Configuration
+import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
