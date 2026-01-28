@@ -56,6 +56,7 @@ object TerminalSessionRepository {
 
     /** Removes a session by ID. If it was selected, selects another one. */
     fun removeSession(id: String) {
+        // Log.d("TerminalSessionRepository", "removeSession() call stack: ${Log.getStackTraceString(Throwable())}")
         val currentList = _sessions.value.toMutableList()
         val index = currentList.indexOfFirst { it.id == id }
         if (index == -1) return
@@ -87,6 +88,7 @@ object TerminalSessionRepository {
 
     /** Resets the sessions to a single new session. */
     fun reset() {
+        // Log.d("TerminalSessionRepository", "reset() call stack: ${Log.getStackTraceString(Throwable())}")
         val newSession = TerminalSession()
         _sessions.value = listOf(newSession)
         _selectedSessionId.value = newSession.id

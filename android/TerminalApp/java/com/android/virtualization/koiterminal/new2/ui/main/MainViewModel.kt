@@ -259,10 +259,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun stopVm() {
+        Log.i("MainViewModel", "MainViewModel.stopVm()")
         VmController.stop()
     }
 
     fun restartVm() {
+        Log.i("MainViewModel", "MainViewModel.restartVm()")
         hasVmEverStarted = false
         TerminalSessionRepository.reset()
         if (VmController.vmState.value is VmState.Rebooting) {
@@ -273,6 +275,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        Log.i("ASDF", "MainViewModel.onCleared()")
         super.onCleared()
         VmController.stop()
     }
@@ -370,6 +373,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     launch {
                         TerminalSessionRepository.sessions.collect { sessions ->
                             if (sessions.isEmpty()) {
+                                Log.i("ASDF", "MainViewModel.launch {if (sessions.isEmpty())}")
                                 stopVm()
                             }
                         }
