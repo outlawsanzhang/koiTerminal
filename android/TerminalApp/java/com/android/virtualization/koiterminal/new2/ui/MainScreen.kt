@@ -110,6 +110,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
     Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState) }) { innerPadding ->
         val padding = if (isFullscreen) PaddingValues(0.dp) else innerPadding
+        Log.d("MainScreen", "Composing. uiState=$uiState lastValidState=$lastValidState, installState=$installState, showIfError=$showIfError, showIfInstallerError=$showIfInstallerError, padding=$padding, innerPadding=$innerPadding, isFullscreen=$isFullscreen")
 
         Box(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
