@@ -69,6 +69,7 @@ public class MainActivity :
     AccessibilityManager.AccessibilityStateChangeListener {
     var displayMenu: Button? = null
     var tabAddButton: Button? = null
+    var tabAddSerialButton: Button? = null
     val bootCompleted = ConditionVariable()
     lateinit var modifierKeysController: ModifierKeysController
     private lateinit var tabScrollView: HorizontalScrollView
@@ -128,6 +129,7 @@ public class MainActivity :
         tabLayout = findViewById<TabLayout>(R.id.tab_layout)
         displayMenu = findViewById<Button>(R.id.display_button)
         tabAddButton = findViewById<Button>(R.id.tab_add_button)
+        tabAddSerialButton = findViewById<Button>(R.id.tab_add_serial_button)
         tabScrollView = findViewById<HorizontalScrollView>(R.id.tab_scrollview)
         val modifierKeysContainerView =
             findViewById<RelativeLayout>(R.id.modifier_keys_container) as ViewGroup
@@ -177,6 +179,7 @@ public class MainActivity :
         addTerminalTab()
 
         tabAddButton?.setOnClickListener { addTerminalTab() }
+        tabAddSerialButton?.setOnClickListener { addTerminalTab(mode = TerminalTabAdapter.MODE_SERIAL) }
     }
 
     private fun createTerminalSerialTabFragment(outReadingPfd: ParcelFileDescriptor, inWritingPfd: ParcelFileDescriptor): TerminalSerialTabFragment {
