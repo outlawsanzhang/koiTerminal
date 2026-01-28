@@ -56,6 +56,13 @@
                 android:layout_height="wrap_content"
                 android:enabled="false"
                 app:icon="@drawable/ic_add" />
+            <Button
+                android:id="@+id/tab_add_serial_button"
+                style="?attr/materialIconButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:enabled="true"
+                app:icon="@drawable/ic_add_serial" />
         </LinearLayout>
     </HorizontalScrollView>
 
