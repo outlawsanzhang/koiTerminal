@@ -32,6 +32,7 @@ import com.android.virtualization.terminal.proto.StorageBalloonQueueOpeningReque
 import com.android.virtualization.terminal.proto.StorageBalloonRequestItem
 import io.grpc.stub.ServerCallStreamObserver
 import io.grpc.stub.StreamObserver
+import java.lang.UnsatisfiedLinkError
 
 internal class DebianServiceImpl(context: Context) : DebianServiceImplBase() {
     private val portsStateManager = PortsStateManager.getInstance(context)
@@ -173,7 +174,11 @@ internal class DebianServiceImpl(context: Context) : DebianServiceImplBase() {
             portsStateManager.unregisterListener(portsStateListener!!)
             portsStateListener = null
         }
-        terminateForwarderHost()
+        try {
+            terminateForwarderHost()
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "killForwarderHost error", e)
+        }
     }
 
     private fun updateListeningPorts() {
