@@ -195,6 +195,7 @@ fun RunningScreen(state: MainUiState.Running, viewModel: MainViewModel) {
                         onTabSelected = { viewModel.selectTab(it) },
                         onTabClosed = { viewModel.closeTab(it) },
                         onAddTab = { viewModel.addTab() },
+                        onAddSerialTab = { viewModel.addSerialTab() },
                     )
                 }
                 DisplayController(viewModel = viewModel)

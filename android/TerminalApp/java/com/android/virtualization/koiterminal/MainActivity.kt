@@ -82,6 +82,7 @@ public class MainActivity :
     private val terminalViewModel: TerminalViewModel by viewModels()
     private lateinit var displayMenu: Button
     private var tabAddButton: Button? = null
+    private var tabAddSerialButton: Button? = null
     private val bootCompleted = ConditionVariable()
     private var isVmRunning = false
     private var isTtydConnected = false
@@ -129,6 +130,7 @@ public class MainActivity :
         tabLayout = findViewById<TabLayout>(R.id.tab_layout)
         displayMenu = findViewById<Button>(R.id.display_button)
         tabAddButton = findViewById<Button>(R.id.tab_add_button)
+        tabAddSerialButton = findViewById<Button>(R.id.tab_add_serial_button)
         tabScrollView = findViewById<HorizontalScrollView>(R.id.tab_scrollview)
         val modifierKeysContainerView =
             findViewById<RelativeLayout>(R.id.modifier_keys_container) as ViewGroup
@@ -185,6 +187,7 @@ public class MainActivity :
         addTerminalTab()
 
         tabAddButton?.setOnClickListener { addTerminalTab() }
+        tabAddSerialButton?.setOnClickListener { addTerminalTab(mode = TerminalTabAdapter.MODE_SERIAL) }
     }
 
     private fun createTerminalSerialTabFragment(outReadingPfd: ParcelFileDescriptor, inWritingPfd: ParcelFileDescriptor): TerminalSerialTabFragment {
@@ -275,6 +278,14 @@ public class MainActivity :
             null /* mimeTypes */,
             null, /* callback */
         )
+    }
+
+    override fun onStart() {
+        // It seems that serialIn and serialOut do not persist beyond onStop()
+        super.onStart()
+        Log.i("$TAG-onStart()", "Querying serial console PFDs.")
+        val intent = VmLauncherService.getIntentForQuerySerial(this, this)
+        startService(intent)
     }
 
     fun fontSize(): Float {
