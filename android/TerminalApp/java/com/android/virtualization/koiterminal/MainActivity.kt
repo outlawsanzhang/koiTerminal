@@ -25,6 +25,7 @@ import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.graphics.fonts.FontStyle
 import android.media.MediaScannerConnection
+import android.widget.TextView
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -355,6 +356,14 @@ public class MainActivity :
         isVmRunning = false
         // TODO: error cause is too simple.
         ErrorActivity.start(this, Exception("onVmError"))
+    }
+
+    override fun onTtydTimeout() {
+        Log.i(TAG, "onTtydTimeout()")
+        isVmRunning = false
+        viewPager
+                ?.findViewById<TextView>(R.id.boot_progress_text)
+                ?.text = resources.getString(R.string.vm_creation_ttyd_timeout_message)
     }
 
     override fun onAccessibilityStateChanged(enabled: Boolean) {
