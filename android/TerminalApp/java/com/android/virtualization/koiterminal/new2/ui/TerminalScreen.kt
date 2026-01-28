@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -89,6 +90,7 @@ fun TerminalTabBar(
     onTabSelected: (String) -> Unit,
     onTabClosed: (String) -> Unit,
     onAddTab: () -> Unit,
+    onAddSerialTab: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -131,10 +133,18 @@ fun TerminalTabBar(
                         tabViewModel = tabViewModel,
                     )
                     if (index == tabs.lastIndex) {
-                        Box(modifier = Modifier.padding(horizontal = 6.dp)) {
+                        Row(modifier = Modifier.padding(horizontal = 6.dp)) {
                             IconButton(onClick = onAddTab) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
+                                    contentDescription =
+                                        stringResource(R.string.terminal_hint_btn_add_tab),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                            IconButton(onClick = onAddSerialTab) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_add_serial),
                                     contentDescription =
                                         stringResource(R.string.terminal_hint_btn_add_tab),
                                     modifier = Modifier.size(24.dp),
