@@ -197,6 +197,8 @@ class SettingsDiskResizeActivity : AppCompatActivity() {
                     }
 
                     override fun onVmError() {}
+
+                    override fun onTtydTimeout() {}
                 },
             )
         startService(intent)
