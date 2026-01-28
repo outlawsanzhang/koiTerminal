@@ -195,5 +195,7 @@ Folders from upstream: same as upstream (Apache 2.0). See [NOTICE](NOTICE).
 
 Folders from Termux: same as `terminal-view` and `terminal-emulator` directories from Termux (Apache 2.0). See [their LICENCE.md](https://github.com/termux/termux-app/blob/master/LICENCE.md).
 
-Carp in the icon from [public domain](https://freesvg.org/vector-clip-art-of-seamless-pattern-of-carp).
+Vector graphics:
+- Carp in the icon [public domain](https://freesvg.org/vector-clip-art-of-seamless-pattern-of-carp).
+- Serial connection [CC0](https://openclipart.org/detail/244265/power-cable-icon-redrawn)
 
