@@ -1,0 +1,4 @@
+virtio_blk
+virtio_pci
+isofs
+erofs

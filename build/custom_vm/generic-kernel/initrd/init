@@ -1,0 +1,97 @@
+#!/bin/sh -e
+
+. /scripts/env-setup
+. /scripts/helper-utils
+
+__info "Minimal initrd starting ..."
+
+mkdir -p /proc && mount -t proc -o nodev,noexec,nosuid proc /proc \
+  || __error "Failed to mount /proc"
+mkdir -p /sys && mount -t sysfs -o nodev,noexec,nosuid sysfs /sys \
+  || __error "Failed to mount /sys"
+mkdir -p /dev && mount -t devtmpfs -o noexec,nosuid,mode=0755 devtmpfs /dev \
+  || __error "Failed to mount /dev"
+
+early_load_modules || __error "Failed to load early modules"
+
+mdev -s || __warning "Failed mdev invocation"
+
+ROOT_DEV=""
+REAL_INIT="/sbin/init"
+
+for param in $(cat /proc/cmdline); do
+  case "$param" in
+    root=*) ROOT_DEV="${param#root=}" ;;
+    init=*) REAL_INIT="${param#init=}" ;;
+  esac
+done
+
+[ -n "$ROOT_DEV" ] || __error "No root=... specified in the kernel cmdline"
+for i in $(seq 1 10); do
+  [ -b "$ROOT_DEV" ] && break
+  __info "Waiting for root device $ROOT_DEV ..."
+  sleep "0.5s"
+done
+[ -b "$ROOT_DEV" ] || __error "$ROOT_DEV not found after 5 seconds"
+mkdir -p /newroot && mount -t auto "$ROOT_DEV" /newroot \
+  || __error "Failed to mount $ROOT_DEV"
+
+if [ -n "$KERNEL_EXTRAS_UUID" ]; then
+  KERNEL_EXTRAS_DEV="$(blkid | grep "$KERNEL_EXTRAS_UUID" | cut -d: -f1)"
+  KERNEL_EXTRAS_ROOT="/newroot/opt/kernel_extras"
+
+  mkdir -p "$KERNEL_EXTRAS_ROOT" \
+    && mount -t auto "$KERNEL_EXTRAS_DEV" "$KERNEL_EXTRAS_ROOT" \
+    || __error "Failed to mount kernel extras from $KERNEL_EXTRAS_DEV"
+
+  __info "Symlinking kernel extras into rootfs ..."
+  if [ -d "$KERNEL_EXTRAS_ROOT/lib/modules" ]; then
+    for module_dir in "$KERNEL_EXTRAS_ROOT/lib/modules"/* ; do
+      base_dir="$(basename "$module_dir")"
+
+      # NOTE: Debian enforced merged /usr now: https://wiki.debian.org/UsrMerge.
+      lib_dir="/newroot/lib"
+      [ ! -L "$lib_dir" ] || lib_dir="/newroot/usr/lib"
+
+      mkdir -p "$lib_dir/modules" \
+        && ln -sfv "/opt/kernel_extras/lib/modules/$base_dir" \
+                   "$lib_dir/modules/$base_dir" \
+        || __warning "Failed to symlink $module_dir"
+    done
+  fi
+  if [ -d "$KERNEL_EXTRAS_ROOT/usr/lib" ]; then
+    for dtb_dir in "$KERNEL_EXTRAS_ROOT/usr/lib"/* ; do
+      base_dir="$(basename "$dtb_dir")"
+      mkdir -p "/newroot/usr/lib" \
+        && ln -sfv "/opt/kernel_extras/usr/lib/$base_dir" \
+                   "/newroot/usr/lib/$base_dir" \
+        || __warning "Failed to symlink $dtb_dir"
+    done
+  fi
+  if [ -d "$KERNEL_EXTRAS_ROOT/usr/src" ]; then
+    for header_dir in "$KERNEL_EXTRAS_ROOT/usr/src"/* ; do
+      base_dir="$(basename "$header_dir")"
+      mkdir -p "/newroot/usr/src" \
+        && ln -sfv "/opt/kernel_extras/usr/src/$base_dir" \
+                   "/newroot/usr/src/$base_dir" \
+        || __warning "Failed to symlink $header_dir"
+    done
+  fi
+else
+  __warning "KERNEL_EXTRAS_UUID not specified, not mounting kernel extras"
+fi
+
+sync
+
+if [ -L "/newroot/$REAL_INIT" ]; then
+    REAL_INIT_LINK="$(readlink "/newroot/$REAL_INIT")"
+    if ! [[ "$REAL_INIT_LINK" =~ ".*/busybox" ]]; then
+        REAL_INIT="$REAL_INIT_LINK"
+    fi
+fi
+[ -x "/newroot/$REAL_INIT" ] || __error "Failed to find $REAL_INIT in $ROOT_DEV"
+
+__info "Switching to $REAL_INIT in $ROOT_DEV ..."
+exec switch_root /newroot "$REAL_INIT" || __error "Failed to switch root"
+
+__error "Unexpected error; should not reach here"
