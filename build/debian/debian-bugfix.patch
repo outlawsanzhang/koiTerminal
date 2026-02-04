@@ -1,0 +1,24 @@
+diff -ru -p2 debian/rules debian/rules
+--- debian/rules
++++ debian/rules
+@@ -45,4 +45,8 @@ build-arch: debian/control
+ 	@printf '%s\n' 'blhc: ignore-line-regexp: .* -o .*tools/perf/tests/workloads/.*'
+
++# Those tools conflict between flags used for host and build, so get none
++	@printf '%s\n' 'blhc: ignore-line-regexp: .* -o .*/tools/objtool/.*'
++	@printf '%s\n' 'blhc: ignore-line-regexp: .* -o .*/tools/.*/fixdep.*'
++
+ # We need to use terse builds in CI due to the log size limit.  This
+ # mostly affects the output for builds of kernel code, which need
+diff -ru -p2 debian/rules.real debian/rules.real
+--- debian/rules.real
++++ debian/rules.real
+@@ -46,5 +46,6 @@ setup_env += DISTRIBUTION_OFFICIAL_BUILD
+ setup_env += KBUILD_VERBOSE=$(if $(filter terse,$(DEB_BUILD_OPTIONS)),0,1)
+
+-MAKE_CLEAN = $(setup_env) $(MAKE) KCFLAGS=-fdebug-prefix-map=$(CURDIR)/= KBUILD_HOSTCFLAGS='$(CFLAGS) $(CPPFLAGS)' HOSTCFLAGS='$(CFLAGS) $(CPPFLAGS)' KBUILD_HOSTLDFLAGS='$(LDFLAGS)'
++# XXX: All the tools leak flags between host and build all the time, just don't care.  See #1050991.
++MAKE_CLEAN = $(setup_env) $(MAKE) KCFLAGS=-fdebug-prefix-map=$(CURDIR)/= KBUILD_HOSTCFLAGS='' HOSTCFLAGS='' KBUILD_HOSTLDFLAGS=''
+ MAKE_SELF := $(MAKE) -f debian/rules.real $(MAKEOVERRIDES)
+ MAKEOVERRIDES =
+

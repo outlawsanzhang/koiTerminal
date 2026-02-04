@@ -43,6 +43,7 @@ GUEST_PACKAGES=(
 remove_default_kernels() {
   echo "--- Removing default kernel packages ---"
   apt purge -y linux-image-*
+  rm /etc/kernel/postrm.d/zz-update-grub || true # fix: updating grub post-purge breaks in chroot, but we don't need grub
 }
 
 # Install required packages and optimize the process
