@@ -1,0 +1,12 @@
+__error() {
+  echo "ERROR: $1; dropping to shell"
+  exec sh
+}
+
+__info() {
+  echo "INFO: $1"
+}
+
+__warning() {
+  echo "WARNING: $1; continuing anyway"
+}

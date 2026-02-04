@@ -1,0 +1,222 @@
+#!/bin/bash
+# This file largely mimics build/debian/build_custom_kernel.sh
+
+set -x
+
+SCRIPT_DIR="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+
+show_help() {
+    set +x
+    echo "Usage: $0 [OPTION]..."
+    echo "Example: $0 -a aarch64 -p -W ./ -d ./images"
+    echo "Builds debian kernel. [sudo is required]"
+    echo "Options:"
+    echo "-a ARCH      Architecture of the image [default is host arch: $(uname -m)]"
+    echo "-d DEST_DIR  Destination directory for output packages. Requires DEST_DIR/kernel_extras"
+    echo "             folder to hold kernel build and installation results. [default: $SCRIPT_DIR]"
+    echo "-h           Print usage and this help message and exit."
+    echo "-p           Apply AVF patches to Debian."
+    echo "-w           Save temp work directory [for debugging]"
+    echo "-W WORK_DIR  Specify work dir instead of temporarily creating. Imply -w [for debugging]"
+}
+
+check_sudo() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "Please run as root." ; exit 1
+    fi
+}
+
+parse_options() {
+    while getopts "a:d:hwW:" option; do
+        case ${option} in
+            a)
+                arch="$OPTARG"
+                ;;
+            d)
+                dest_dir="$OPTARG"
+                ;;
+            h)
+                show_help ; exit
+                ;;
+            h)
+                avf_patch=1 ; exit
+                ;;
+            w)
+                save_workdir=1
+                ;;
+            W)
+                workdir="${OPTARG%/}"
+                save_workdir=1
+                may_skip_build=1
+                ;;
+            *)
+                echo "Invalid option: $OPTARG" ; exit 1
+                ;;
+        esac
+    done
+    case "$arch" in
+        aarch64)
+            debian_arch="arm64"
+            ;;
+        *)
+            echo "Invalid architecture: $arch" ; exit 1
+            ;;
+    esac
+    if [[ "${*:$OPTIND:1}" ]]; then
+        output="${*:$OPTIND:1}"
+    fi
+}
+
+build_custom_kernel() {
+    dest_dir="$(realpath "$dest_dir")"
+    workdir="$(realpath "$workdir")"
+    if [[ "$may_skip_build" == 1 && -f "${dest_dir}/vmlinuz" ]]; then
+        echo "Skipping build_custom_kernel(). ${dest_dir}/vmlinuz already exists"
+        return
+    fi
+    mkdir -p "$dest_dir"
+    mkdir -p "$workdir"
+
+    local deb_base_url="https://deb.debian.org/debian"
+    local deb_security_base_url="https://security.debian.org/debian-security"
+
+    local pool_dir="pool/main/l/linux"
+    local ksrc_base_url="${deb_base_url}/${pool_dir}"
+    local ksrc_security_base_url="${deb_security_base_url}/${pool_dir}"
+
+    # NOTE: 6.1 is the latest LTS kernel for which Debian's kernel build scripts
+    #       work on Python 3.10, the default version on our Ubuntu 22.04 builders.
+    #
+    #       We track the latest Debian stable kernel version for the 6.1 branch,
+    #       which can be found at:
+    #       https://packages.debian.org/stable/linux-source-6.1
+    local debian_kver="6.1.135-1"
+
+    local dsc_file="linux_${debian_kver}.dsc"
+    local orig_ksrc_file="linux_${debian_kver%-*}.orig.tar.xz"
+    local debian_ksrc_file="linux_${debian_kver}.debian.tar.xz"
+
+    # 0. Grab the kernel sources, and the latest debian keyrings
+    mkdir -p "${workdir}/kernel"
+    pushd "${workdir}/kernel" > /dev/null
+
+    ls "${dsc_file}" || wget "${ksrc_security_base_url}/${dsc_file}" || \
+    wget "${ksrc_base_url}/${dsc_file}"
+
+    ls "${orig_ksrc_file}" || wget "${ksrc_security_base_url}/${orig_ksrc_file}" || \
+    wget "${ksrc_base_url}/${orig_ksrc_file}"
+
+    ls "${debian_ksrc_file}" || wget "${ksrc_security_base_url}/${debian_ksrc_file}" || \
+    wget "${ksrc_base_url}/${debian_ksrc_file}"
+
+    # Assume available on debian
+    # rsync -az --progress keyring.debian.org::keyrings/keyrings/ /usr/share/keyrings/
+
+    # 1. Verify, extract and merge patches into the original kernel sources
+    dpkg-source --require-strong-checksums \
+                --require-valid-signature \
+                --extract "${dsc_file}"
+    pushd "linux-${debian_kver%-*}" > /dev/null
+
+    # Perform patching?
+    if [ "$avf_patch" -eq 1 ]; then
+        local kpatches_src="$SCRIPT_DIR/kernel/patches"
+        cp -r "${kpatches_src}/avf" debian/patches/
+        cat "${kpatches_src}/series" >> debian/patches/series
+    fi
+    # Apply our patch to fix compile issues. FIXME: Why is this even necessary?
+    #   See: https://salsa.debian.org/kernel-team/linux/-/merge_requests/833
+    patch -p0 < "$SCRIPT_DIR/debian-bugfix.patch"
+    ./debian/rules orig
+
+    local custom_flavour="avf"
+    local debarch_flavour="${custom_flavour}-${debian_arch}"
+
+    local abi_kver="$(sed -nE 's;Package: linux-support-(.*);\1;p' debian/control)"
+    local abi_common="${abi_kver}-common"
+    abi_flavour="${abi_kver}-${debarch_flavour}"
+
+    # 2. Define our custom flavour and regenerate control file
+    # NOTE: Our flavour extends Debian's `cloud` config on the `none` featureset.
+    cp "$SCRIPT_DIR/kernel/config" \
+       debian/config/${debian_arch}/config.${debarch_flavour}
+
+    sed -z "s;\[base\]\nflavours:;[base]\nflavours:\n ${debarch_flavour};" \
+        -i debian/config/${debian_arch}/none/defines
+    cat >> debian/config/${debian_arch}/none/defines <<EOF
+[${debarch_flavour}_image]
+configs:
+ config.cloud
+ ${debian_arch}/config.${debarch_flavour}
+EOF
+    cat >> debian/config/${debian_arch}/defines <<EOF
+[${debarch_flavour}_description]
+hardware: ${arch} AVF
+hardware-long: ${arch} Android Virtualization Framework
+EOF
+    ./debian/rules debian/control || true
+
+    # 3. Build the kernel and generate Debian packages
+    ./debian/rules source
+    export DEB_BUILD_PROFILES="nodoc"
+    [[ "$arch" == "$(uname -m)" ]] || export $(dpkg-architecture -a $debian_arch)
+    make -j$(nproc) -f debian/rules.gen \
+         "binary-indep" \
+         "binary-arch_${debian_arch}_none_${debarch_flavour}"
+
+    popd > /dev/null
+
+    # 4. Create the kernel_extras disk image.
+    mkdir kernel_extras
+    dpkg-deb --extract "linux-image-${abi_flavour}-unsigned_${debian_kver}_${debian_arch}.deb" \
+                       kernel_extras
+    dpkg-deb --extract "linux-headers-${abi_flavour}_${debian_kver}_${debian_arch}.deb" \
+                       kernel_extras
+    dpkg-deb --extract "linux-headers-${abi_common}_${debian_kver}_all.deb" \
+                       kernel_extras
+    depmod -b kernel_extras $abi_flavour
+
+    mv kernel_extras/boot/vmlinuz* vmlinuz
+    if [[ "$arch" == "aarch64" ]]; then
+        lz4 -BD -12 -q vmlinuz vmlinuz.lz4
+        mv vmlinuz.lz4 vmlinuz
+    fi
+    mv vmlinuz "${dest_dir}/vmlinuz"
+
+    rm -rf kernel_extras/{boot,usr/share}
+
+    mkfs.erofs kernel_extras_part kernel_extras
+    kernel_extras_loopdev="$(losetup -f --show kernel_extras_part)"
+    kernel_extras_guid="$(blkid -s UUID -o value "${kernel_extras_loopdev}")"
+    echo kernel_extras_guid=$kernel_extras_guid
+    losetup -d "${kernel_extras_loopdev}"
+    mv kernel_extras_part "${dest_dir}/kernel_extras_part"
+    mv kernel_extras "${dest_dir}/kernel_extras"
+}
+
+clean_up() {
+    [ "$save_workdir" -eq 1 ] || rm -rf "${workdir}"
+}
+
+set -e
+trap clean_up EXIT
+
+abi_flavour=
+kernel_extras_guid=
+save_workdir=0
+may_skip_build=1
+dest_dir=$SCRIPT_DIR
+avf_patch=0
+workdir=
+
+check_sudo
+parse_options "$@"
+
+if [[ -n "${workdir}" ]]; then
+    mkdir -p "${workdir}" || true
+else
+    workdir=$(mktemp -d)
+fi
+echo $workdir
+
+build_custom_kernel
