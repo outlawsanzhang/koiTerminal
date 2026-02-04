@@ -1,0 +1,550 @@
+From 71b755110581e7cab93f839c4617735fc682c679 Mon Sep 17 00:00:00 2001
+From: Keir Fraser <keirf@google.com>
+Date: Tue, 10 Dec 2024 08:28:12 +0000
+Subject: [PATCH 1/6] KVM: arm64: Define guest hypercalls
+
+---
+ include/linux/arm-smccc.h | 56 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index 220c8c60e021..02dc0957ec2d 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -112,6 +112,14 @@
+ /* KVM "vendor specific" services */
+ #define ARM_SMCCC_KVM_FUNC_FEATURES		0
+ #define ARM_SMCCC_KVM_FUNC_PTP			1
++#define ARM_SMCCC_KVM_FUNC_HYP_MEMINFO		2
++#define ARM_SMCCC_KVM_FUNC_MEM_SHARE		3
++#define ARM_SMCCC_KVM_FUNC_MEM_UNSHARE		4
++#define ARM_SMCCC_KVM_FUNC_MMIO_GUARD_INFO	5
++#define ARM_SMCCC_KVM_FUNC_MMIO_GUARD_ENROLL	6
++#define ARM_SMCCC_KVM_FUNC_MMIO_GUARD_MAP	7
++#define ARM_SMCCC_KVM_FUNC_MMIO_GUARD_UNMAP	8
++#define ARM_SMCCC_KVM_FUNC_MEM_RELINQUISH	9
+ #define ARM_SMCCC_KVM_FUNC_FEATURES_2		127
+ #define ARM_SMCCC_KVM_NUM_FUNCS			128
+
+@@ -134,6 +142,54 @@
+ 			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
+ 			   ARM_SMCCC_KVM_FUNC_PTP)
+
++#define ARM_SMCCC_VENDOR_HYP_KVM_HYP_MEMINFO_FUNC_ID			\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_HYP_MEMINFO)
++
++#define ARM_SMCCC_VENDOR_HYP_KVM_MEM_SHARE_FUNC_ID			\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_MEM_SHARE)
++
++#define ARM_SMCCC_VENDOR_HYP_KVM_MEM_UNSHARE_FUNC_ID			\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_MEM_UNSHARE)
++
++#define ARM_SMCCC_VENDOR_HYP_KVM_MEM_RELINQUISH_FUNC_ID			\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_MEM_RELINQUISH)
++
++#define ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_INFO_FUNC_ID		\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_MMIO_GUARD_INFO)
++
++#define ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_ENROLL_FUNC_ID		\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_MMIO_GUARD_ENROLL)
++
++#define ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_MAP_FUNC_ID			\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_MMIO_GUARD_MAP)
++
++#define ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_UNMAP_FUNC_ID		\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_64,				\
++			   ARM_SMCCC_OWNER_VENDOR_HYP,			\
++			   ARM_SMCCC_KVM_FUNC_MMIO_GUARD_UNMAP)
++
+ /* ptp_kvm counter type ID */
+ #define KVM_PTP_VIRT_COUNTER			0
+ #define KVM_PTP_PHYS_COUNTER			1
+--
+2.47.0.338.g60cca15819-goog
+
+
+From 14104b188b1ce2b2e227a9f5426fc8cb4d777461 Mon Sep 17 00:00:00 2001
+From: Keir Fraser <keirf@google.com>
+Date: Thu, 26 May 2022 14:22:34 +0000
+Subject: [PATCH 2/6] ANDROID: Define mem_relinquish interface for releasing
+ memory to a hypervisor.
+
+On PKVM/ARM64 this uses the ARM SMCCC relinquish hypercall when available.
+
+Bug: 240239989
+Change-Id: Ifa85b641a48f348a2364cf8c6b06b6417f1eeedb
+Signed-off-by: Keir Fraser <keirf@google.com>
+Signed-off-by: Quentin Perret <qperret@google.com>
+---
+ arch/Kconfig                            |  3 ++
+ arch/arm64/Kconfig                      |  1 +
+ arch/arm64/include/asm/hypervisor.h     |  7 +++
+ arch/arm64/include/asm/mem_relinquish.h | 12 +++++
+ arch/arm64/kernel/setup.c               |  6 +++
+ arch/arm64/mm/Makefile                  |  1 +
+ arch/arm64/mm/mem_relinquish.c          | 58 +++++++++++++++++++++++++
+ drivers/firmware/smccc/kvm_guest.c      |  2 +
+ include/linux/mem_relinquish.h          | 20 +++++++++
+ 9 files changed, 110 insertions(+)
+ create mode 100644 arch/arm64/include/asm/mem_relinquish.h
+ create mode 100644 arch/arm64/mm/mem_relinquish.c
+ create mode 100644 include/linux/mem_relinquish.h
+
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 8f138e580d1a..b5fb130a07e2 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -1316,6 +1316,9 @@ config RELR
+ config ARCH_HAS_MEM_ENCRYPT
+ 	bool
+
++config ARCH_HAS_MEM_RELINQUISH
++	bool
++
+ config ARCH_HAS_CC_PLATFORM
+ 	bool
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 505c8a1ccbe0..935c16e89677 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -31,6 +31,7 @@ config ARM64
+ 	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_KEEPINITRD
+ 	select ARCH_HAS_MEMBARRIER_SYNC_CORE
++	select ARCH_HAS_MEM_RELINQUISH
+ 	select ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE
+ 	select ARCH_HAS_PTE_DEVMAP
+ 	select ARCH_HAS_PTE_SPECIAL
+diff --git a/arch/arm64/include/asm/hypervisor.h b/arch/arm64/include/asm/hypervisor.h
+index 0ae427f352c8..88f42d688eb0 100644
+--- a/arch/arm64/include/asm/hypervisor.h
++++ b/arch/arm64/include/asm/hypervisor.h
+@@ -5,6 +5,13 @@
+ #include <asm/xen/hypervisor.h>
+
+ void kvm_init_hyp_services(void);
++void kvm_arm_init_hyp_services(void);
+ bool kvm_arm_hyp_service_available(u32 func_id);
+
++#ifdef CONFIG_MEMORY_BALLOON
++void kvm_init_memrelinquish_services(void);
++#else
++static inline void kvm_init_memrelinquish_services(void) {}
++#endif
++
+ #endif
+diff --git a/arch/arm64/include/asm/mem_relinquish.h b/arch/arm64/include/asm/mem_relinquish.h
+new file mode 100644
+index 000000000000..a4ace9e6e413
+--- /dev/null
++++ b/arch/arm64/include/asm/mem_relinquish.h
+@@ -0,0 +1,12 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2022 Google LLC
++ * Author: Keir Fraser <keirf@google.com>
++ */
++
++#ifndef __ASM_MEM_RELINQUISH_H
++#define __ASM_MEM_RELINQUISH_H
++
++void page_relinquish(struct page *page);
++
++#endif	/* __ASM_MEM_RELINQUISH_H */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index fea3223704b6..f55477b6c02e 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -40,6 +40,7 @@
+ #include <asm/elf.h>
+ #include <asm/cpufeature.h>
+ #include <asm/cpu_ops.h>
++#include <asm/hypervisor.h>
+ #include <asm/kasan.h>
+ #include <asm/numa.h>
+ #include <asm/sections.h>
+@@ -438,3 +439,8 @@ static int __init register_arm64_panic_block(void)
+ 	return 0;
+ }
+ device_initcall(register_arm64_panic_block);
++
++void kvm_arm_init_hyp_services(void)
++{
++	kvm_init_memrelinquish_services();
++}
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index ff1e800ba7a1..f6c1f3511907 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -3,6 +3,7 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   cache.o copypage.o flush.o \
+ 				   ioremap.o mmap.o pgd.o mmu.o \
+ 				   context.o proc.o pageattr.o
++obj-$(CONFIG_MEMORY_BALLOON)	+= mem_relinquish.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+ obj-$(CONFIG_PTDUMP_CORE)	+= ptdump.o
+ obj-$(CONFIG_PTDUMP_DEBUGFS)	+= ptdump_debugfs.o
+diff --git a/arch/arm64/mm/mem_relinquish.c b/arch/arm64/mm/mem_relinquish.c
+new file mode 100644
+index 000000000000..c95bcbb14d92
+--- /dev/null
++++ b/arch/arm64/mm/mem_relinquish.c
+@@ -0,0 +1,58 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2022 Google LLC
++ * Author: Keir Fraser <keirf@google.com>
++ */
++
++#include <linux/arm-smccc.h>
++#include <linux/memory.h>
++#include <linux/mm.h>
++#include <linux/types.h>
++
++#include <asm/hypervisor.h>
++
++static unsigned long memshare_granule_sz;
++
++void kvm_init_memrelinquish_services(void)
++{
++	int i;
++	struct arm_smccc_res res;
++	const u32 funcs[] = {
++		ARM_SMCCC_KVM_FUNC_HYP_MEMINFO,
++		ARM_SMCCC_KVM_FUNC_MEM_RELINQUISH,
++	};
++
++	for (i = 0; i < ARRAY_SIZE(funcs); ++i) {
++		if (!kvm_arm_hyp_service_available(funcs[i]))
++			return;
++	}
++
++	arm_smccc_1_1_invoke(ARM_SMCCC_VENDOR_HYP_KVM_HYP_MEMINFO_FUNC_ID,
++			     0, 0, 0, &res);
++	if (res.a0 > PAGE_SIZE) /* Includes error codes */
++		return;
++
++	memshare_granule_sz = res.a0;
++}
++
++void page_relinquish(struct page *page)
++{
++	phys_addr_t phys, end;
++	u32 func_id = ARM_SMCCC_VENDOR_HYP_KVM_MEM_RELINQUISH_FUNC_ID;
++
++	if (!memshare_granule_sz)
++		return;
++
++	phys = page_to_phys(page);
++	end = phys + PAGE_SIZE;
++
++	while (phys < end) {
++		struct arm_smccc_res res;
++
++		arm_smccc_1_1_invoke(func_id, phys, 0, 0, &res);
++		BUG_ON(res.a0 != SMCCC_RET_SUCCESS);
++
++		phys += memshare_granule_sz;
++	}
++}
++EXPORT_SYMBOL_GPL(page_relinquish);
+diff --git a/drivers/firmware/smccc/kvm_guest.c b/drivers/firmware/smccc/kvm_guest.c
+index 89a68e7eeaa6..0b6a1b2a0857 100644
+--- a/drivers/firmware/smccc/kvm_guest.c
++++ b/drivers/firmware/smccc/kvm_guest.c
+@@ -39,6 +39,8 @@ void __init kvm_init_hyp_services(void)
+
+ 	pr_info("hypervisor services detected (0x%08lx 0x%08lx 0x%08lx 0x%08lx)\n",
+ 		 res.a3, res.a2, res.a1, res.a0);
++
++	kvm_arm_init_hyp_services();
+ }
+
+ bool kvm_arm_hyp_service_available(u32 func_id)
+diff --git a/include/linux/mem_relinquish.h b/include/linux/mem_relinquish.h
+new file mode 100644
+index 000000000000..6b7bf861d92d
+--- /dev/null
++++ b/include/linux/mem_relinquish.h
+@@ -0,0 +1,20 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2022 Google LLC
++ * Author: Keir Fraser <keirf@google.com>
++ */
++
++#ifndef __MEM_RELINQUISH_H__
++#define __MEM_RELINQUISH_H__
++
++#ifdef CONFIG_ARCH_HAS_MEM_RELINQUISH
++
++#include <asm/mem_relinquish.h>
++
++#else	/* !CONFIG_ARCH_HAS_MEM_RELINQUISH */
++
++static inline void page_relinquish(struct page *page) { }
++
++#endif	/* CONFIG_ARCH_HAS_MEM_RELINQUISH */
++
++#endif	/* __MEM_RELINQUISH_H__ */
+--
+2.47.0.338.g60cca15819-goog
+
+
+From 4de68c3d8410bef6a5544caf3835eba8357e08d1 Mon Sep 17 00:00:00 2001
+From: Keir Fraser <keirf@google.com>
+Date: Wed, 9 Nov 2022 13:53:28 +0000
+Subject: [PATCH 3/6] ANDROID: KVM: arm64: memory balloon: Notify hyp when
+ ballooning
+
+When running as a protected VM, the hypervisor isolates the VM's
+memory pages from the host. Returning ownership of a VM page
+therefore requires hypervisor involvement, and acknowledgement from
+the protected VM that it is voluntarily cooperating.
+
+To this end, notify pages via the new relinquish hypercall when they
+are entered into the memory balloon.
+
+Bug: 240239989
+Change-Id: Ic89b45312a7478ddff081a934d99e693eded92dc
+Signed-off-by: Keir Fraser <keirf@google.com>
+Signed-off-by: Quentin Perret <qperret@google.com>
+---
+ include/linux/balloon_compaction.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/include/linux/balloon_compaction.h b/include/linux/balloon_compaction.h
+index 5ca2d5699620..318cfe8b57a6 100644
+--- a/include/linux/balloon_compaction.h
++++ b/include/linux/balloon_compaction.h
+@@ -43,6 +43,7 @@
+ #include <linux/err.h>
+ #include <linux/fs.h>
+ #include <linux/list.h>
++#include <linux/mem_relinquish.h>
+
+ /*
+  * Balloon device information descriptor.
+@@ -95,6 +96,7 @@ static inline void balloon_page_insert(struct balloon_dev_info *balloon,
+ 	__SetPageMovable(page, &balloon_mops);
+ 	set_page_private(page, (unsigned long)balloon);
+ 	list_add(&page->lru, &balloon->pages);
++	page_relinquish(page);
+ }
+
+ /*
+@@ -139,6 +141,7 @@ static inline void balloon_page_insert(struct balloon_dev_info *balloon,
+ {
+ 	__SetPageOffline(page);
+ 	list_add(&page->lru, &balloon->pages);
++	page_relinquish(page);
+ }
+
+ static inline void balloon_page_delete(struct page *page)
+--
+2.47.0.338.g60cca15819-goog
+
+
+From f34713f8af1fe2ed50297743315606f880fcbd03 Mon Sep 17 00:00:00 2001
+From: Keir Fraser <keirf@google.com>
+Date: Thu, 18 Aug 2022 10:41:35 +0000
+Subject: [PATCH 4/6] ANDROID: KVM: arm64: balloon: Notify hyp before reporting
+ free pages to host
+
+When running as a protected VM, the hypervisor isolates the VM's
+memory pages from the host. Returning ownership of a VM page therefore
+requires hypervisor involvement, and acknowledgement from the
+protected VM that it is voluntarily cooperating.
+
+To this end, notify pages via the new relinquish hypercall when they
+are being reported to the host as free and available for temporary
+reclaim.
+
+Bug: 240239989
+Change-Id: I8718e468be63c3aacb2f79ff141fbcedd6d19b56
+Signed-off-by: Keir Fraser <keirf@google.com>
+Signed-off-by: Quentin Perret <qperret@google.com>
+---
+ mm/page_reporting.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/mm/page_reporting.c b/mm/page_reporting.c
+index 382958eef8a9..5c4b1fb73187 100644
+--- a/mm/page_reporting.c
++++ b/mm/page_reporting.c
+@@ -7,6 +7,7 @@
+ #include <linux/module.h>
+ #include <linux/delay.h>
+ #include <linux/scatterlist.h>
++#include <linux/mem_relinquish.h>
+
+ #include "page_reporting.h"
+ #include "internal.h"
+@@ -120,7 +121,7 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
+ 	unsigned int page_len = PAGE_SIZE << order;
+ 	struct page *page, *next;
+ 	long budget;
+-	int err = 0;
++	int i, err = 0;
+
+ 	/*
+ 	 * Perform early check, if free area is empty there is
+@@ -175,6 +176,10 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
+ 			--(*offset);
+ 			sg_set_page(&sgl[*offset], page, page_len, 0);
+
++			/* Notify hyp that these pages are reclaimable. */
++			for (i = 0; i < (1<<order); i++)
++				page_relinquish(page+i);
++
+ 			continue;
+ 		}
+
+--
+2.47.0.338.g60cca15819-goog
+
+
+From 429502a582c1c900681a82fb94f9078d0569c731 Mon Sep 17 00:00:00 2001
+From: Keir Fraser <keirf@google.com>
+Date: Thu, 18 Aug 2022 11:20:25 +0000
+Subject: [PATCH 5/6] ANDROID: virtio_balloon: Do not translate reported pages
+ through DMA API
+
+The free-page reporting and hinting queues do not pass arrays of page
+addresses (like the basic inflate queue) but instead pass the free page
+ranges as buffers. This does not work well with DMA API: The host wants
+to know the GPA, not an IOVA.
+
+For these two virtqueues, disable DMA API and pass through buffers untranslated.
+
+Bug: 240239989
+Change-Id: I2d13a8b7e8f6775819de7fe96f4579afa08b1300
+Signed-off-by: Keir Fraser <keirf@google.com>
+[ qperret@: Fixed minor context conflict in virtio.h ]
+Signed-off-by: Quentin Perret <qperret@google.com>
+---
+ drivers/virtio/virtio_balloon.c |  8 ++++++--
+ drivers/virtio/virtio_ring.c    | 10 ++++++++++
+ include/linux/virtio.h          |  2 ++
+ 3 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/virtio/virtio_balloon.c b/drivers/virtio/virtio_balloon.c
+index 3f78a3a1eb75..4c85349024c1 100644
+--- a/drivers/virtio/virtio_balloon.c
++++ b/drivers/virtio/virtio_balloon.c
+@@ -553,11 +553,15 @@ static int init_vqs(struct virtio_balloon *vb)
+ 		virtqueue_kick(vb->stats_vq);
+ 	}
+
+-	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_FREE_PAGE_HINT))
++	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_FREE_PAGE_HINT)) {
+ 		vb->free_page_vq = vqs[VIRTIO_BALLOON_VQ_FREE_PAGE];
++		virtqueue_disable_dma_api_for_buffers(vb->free_page_vq);
++	}
+
+-	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_REPORTING))
++	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_REPORTING)) {
+ 		vb->reporting_vq = vqs[VIRTIO_BALLOON_VQ_REPORTING];
++		virtqueue_disable_dma_api_for_buffers(vb->reporting_vq);
++	}
+
+ 	return 0;
+ }
+diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
+index 2e7689bb933b..3eca7140bd80 100644
+--- a/drivers/virtio/virtio_ring.c
++++ b/drivers/virtio/virtio_ring.c
+@@ -2863,4 +2863,14 @@ const struct vring *virtqueue_get_vring(struct virtqueue *vq)
+ }
+ EXPORT_SYMBOL_GPL(virtqueue_get_vring);
+
++/*
++ * Prevents use of DMA API for buffers passed via the specified virtqueue.
++ * DMA API may still be used for the vrings themselves.
++ */
++void virtqueue_disable_dma_api_for_buffers(struct virtqueue *vq)
++{
++	to_vvq(vq)->use_dma_api = false;
++}
++EXPORT_SYMBOL_GPL(virtqueue_disable_dma_api_for_buffers);
++
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/virtio.h b/include/linux/virtio.h
+index dcab9c7e8784..34e936343ae4 100644
+--- a/include/linux/virtio.h
++++ b/include/linux/virtio.h
+@@ -96,6 +96,8 @@ dma_addr_t virtqueue_get_used_addr(struct virtqueue *vq);
+ int virtqueue_resize(struct virtqueue *vq, u32 num,
+ 		     void (*recycle)(struct virtqueue *vq, void *buf));
+
++void virtqueue_disable_dma_api_for_buffers(struct virtqueue *vq);
++
+ /**
+  * struct virtio_device - representation of a device using virtio
+  * @index: unique position on the virtio bus
+--
+2.47.0.338.g60cca15819-goog
+
+
+From 49de3a1d0bb478858eb66a5b853f0d0a5b1909dc Mon Sep 17 00:00:00 2001
+From: Keir Fraser <keirf@google.com>
+Date: Thu, 17 Nov 2022 14:59:38 +0000
+Subject: [PATCH 6/6] ANDROID: virtio_balloon: Do not clear
+ VIRTIO_F_ACCESS_PLATFORM
+
+This essentially reverts commit e41b1355508debe45fda33
+"virtio_balloon: disable VIOMMU support".
+
+Although the virtio_balloon driver does not translate through a
+VIOMMU (or bounce buffer) the pages that it sends to the device,
+it *does* need to perform these translations on the virtio rings
+themselves.
+
+This fixes virtio_balloon initialisation inside a PKVM/ARM64
+protected virtual machine.
+
+Bug: 240239989
+Change-Id: I2a84eec870fd638223b231e5c4d1c27216dc40a2
+Signed-off-by: Keir Fraser <keirf@google.com>
+Signed-off-by: Quentin Perret <qperret@google.com>
+---
+ drivers/virtio/virtio_balloon.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/virtio/virtio_balloon.c b/drivers/virtio/virtio_balloon.c
+index 4c85349024c1..72fe24005bc0 100644
+--- a/drivers/virtio/virtio_balloon.c
++++ b/drivers/virtio/virtio_balloon.c
+@@ -1097,7 +1097,6 @@ static int virtballoon_validate(struct virtio_device *vdev)
+ 	else if (!virtio_has_feature(vdev, VIRTIO_BALLOON_F_PAGE_POISON))
+ 		__virtio_clear_bit(vdev, VIRTIO_BALLOON_F_REPORTING);
+
+-	__virtio_clear_bit(vdev, VIRTIO_F_ACCESS_PLATFORM);
+ 	return 0;
+ }
+
+--
+2.47.0.338.g60cca15819-goog

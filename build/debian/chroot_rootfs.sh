@@ -134,7 +134,7 @@ cleanup() {
   done
 
   # Unmount virtual and root filesystems
-  umount -R "${CHROOT_WORKSPACE}" || true
+  umount -R -l "${CHROOT_WORKSPACE}" || true # -l fixes breakage when folder being busy
 
   # Remove temporary workspace directory
   rm -rf "${CHROOT_WORKSPACE}"
