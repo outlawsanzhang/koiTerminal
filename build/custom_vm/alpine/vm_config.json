@@ -1,0 +1,44 @@
+{
+    "name": "terminal",
+    "disks": [
+        {
+            "partitions": [
+                {
+                    "label": "ROOT",
+                    "path": "$PAYLOAD_DIR/root_part",
+                    "writable": true
+                },
+                {
+                    "label": "KERNEL_EXTRAS",
+                    "path": "$PAYLOAD_DIR/kernel_extras_part",
+                    "writable": false
+                },
+                {
+                    "label": "CA",
+                    "path": "$PAYLOAD_DIR/../ca.crt",
+                    "writable": false
+                }
+            ],
+            "writable": true
+        }
+    ],
+    "sharedPath": [],
+    "kernel": "$PAYLOAD_DIR/vmlinuz",
+    "initrd": "$PAYLOAD_DIR/initrd.img",
+    "params": "root=/dev/vda1 ro rootfstype=ext4",
+    "protected": false,
+    "cpu_topology": "match_host",
+    "platform_version": "~1.0",
+    "memory_mib": 4096,
+    "debuggable": true,
+    "connect_console": true,
+    "console_out": true,
+    "console_input_device": "ttyS0",
+    "console_in": true,
+    "network": true,
+    "auto_memory_balloon": true,
+    "gpu": {
+        "backend": "2d"
+    }
+}
+
