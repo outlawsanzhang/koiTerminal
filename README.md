@@ -191,9 +191,10 @@ tar czf images.tar.gz --directory images .
 
 # Misc
 ### License
-Folders from upstream: same as upstream (Apache 2.0). See [NOTICE](NOTICE).
+All new files and files from upstream GrapheneOS: released under Apache 2.0. See [LICENSE](LICENSE). See upstream license [NOTICE](NOTICE).
 
-Folders from Termux: same as `terminal-view` and `terminal-emulator` directories from Termux (Apache 2.0). See [their LICENCE.md](https://github.com/termux/termux-app/blob/master/LICENCE.md).
+Folders from Termux: released under the same license as `terminal-view` and `terminal-emulator` directories from Termux (Apache 2.0). See [their LICENCE.md](https://github.com/termux/termux-app/blob/master/LICENCE.md). These include:
+- Files under `android/TerminalApp/java/com/termux`
 
 Vector graphics:
 - Carp in the icon [public domain](https://freesvg.org/vector-clip-art-of-seamless-pattern-of-carp).
