@@ -1,13 +1,12 @@
 {
-    "name": "debian",
+    "name": "terminal",
     "disks": [
         {
             "partitions": [
                 {
                     "label": "ROOT",
                     "path": "$PAYLOAD_DIR/root_part",
-                    "writable": true,
-                    "guid": "B2977D6F-3F73-4111-B4EA-9E9696D033EB"
+                    "writable": true
                 },
                 {
                     "label": "KERNEL_EXTRAS",
@@ -15,21 +14,18 @@
                     "writable": false
                 },
                 {
-                    "label": "CA_CERT",
+                    "label": "CA",
                     "path": "$PAYLOAD_DIR/../ca.crt",
                     "writable": false
                 }
             ],
             "writable": true
-        },
-        {
-            "image": "$PAYLOAD_DIR/cidata.iso"
         }
     ],
     "sharedPath": [],
     "kernel": "$PAYLOAD_DIR/vmlinuz",
     "initrd": "$PAYLOAD_DIR/initrd.img",
-    "params": "root=/dev/vda1 ds=nocloud",
+    "params": "root=/dev/vda1 ro rootfstype=ext4",
     "protected": false,
     "cpu_topology": "match_host",
     "platform_version": "~1.0",
@@ -38,6 +34,7 @@
     "connect_console": true,
     "console_out": true,
     "console_input_device": "ttyS0",
+    "console_in": true,
     "network": true,
     "auto_memory_balloon": true,
     "gpu": {

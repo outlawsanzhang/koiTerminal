@@ -16,6 +16,7 @@ install_localdebs() {
 
 _copy_files() {
 	cp -vR "${LOCALFILES}"/* /
+	sed -i -e "s;agetty -o ';agetty --autologin droid -o '-f ;g" /usr/lib/systemd/system/serial-getty@.service # auto login
 	mkdir -p /mnt/internal
 	ln -s /dev/vda3 /mnt/internal/ca.crt
 }
