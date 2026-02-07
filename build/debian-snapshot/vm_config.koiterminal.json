@@ -7,28 +7,24 @@
                     "label": "ROOT",
                     "path": "$PAYLOAD_DIR/root_part",
                     "writable": true,
-                    "guid": "{root_part_guid}"
+                    "guid": "4CBC5241-06BA-400B-A522-F38C3D652006"
                 },
                 {
-                    "label": "KERNEL_EXTRAS",
-                    "path": "$PAYLOAD_DIR/kernel_extras_part",
+                    "label": "CA_CERT",
+                    "path": "$PAYLOAD_DIR/../ca.crt",
                     "writable": false
                 }
             ],
             "writable": true
-        }
-    ],
-    "sharedPath": [
-        {
-            "sharedPath": "/storage/emulated"
         },
         {
-            "sharedPath": "$APP_DATA_DIR/files"
+            "image": "$PAYLOAD_DIR/cidata.iso"
         }
     ],
+    "sharedPath": [],
     "kernel": "$PAYLOAD_DIR/vmlinuz",
     "initrd": "$PAYLOAD_DIR/initrd.img",
-    "params": "root=/dev/vda1",
+    "params": "root=/dev/vda1 ds=nocloud arm64.nompam 8250.nr_uarts=4 console=ttyS0",
     "protected": false,
     "cpu_topology": "match_host",
     "platform_version": "~1.0",
@@ -36,10 +32,12 @@
     "debuggable": true,
     "connect_console": true,
     "console_out": true,
+    "console_in": true,
     "console_input_device": "ttyS0",
     "network": true,
     "auto_memory_balloon": true,
     "gpu": {
         "backend": "2d"
-    }
+    },
+    "boot_timeout_secs": 60
 }

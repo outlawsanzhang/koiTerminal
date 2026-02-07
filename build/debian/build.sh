@@ -81,8 +81,8 @@ parse_options() {
 
 install_prerequisites() {
 	apt update
-	apt install software-properties-common -y
-	add-apt-repository -y ppa:fai/ppa
+	# apt install software-properties-common -y
+	# add-apt-repository -y ppa:fai/ppa
 	apt update
 	packages=(
 		apt-utils
@@ -94,8 +94,8 @@ install_prerequisites() {
 		curl
 		debsums
 		dosfstools
-		fai-server
-		fai-setup-storage
+		# fai-server
+		# fai-setup-storage
 		fdisk
 		git
 		libjson-c-dev
@@ -112,6 +112,7 @@ install_prerequisites() {
 		qemu-utils
 		sudo
 		udev
+		wget
 	)
 	if [[ "$arch" == "aarch64" ]]; then
 		packages+=(
@@ -134,7 +135,7 @@ install_prerequisites() {
 	DEBIAN_FRONTEND=noninteractive \
 		apt install --no-install-recommends --assume-yes "${packages[@]}"
 
-	if [ ! -f $"HOME"/.cargo/bin/cargo ]; then
+	if [ ! -f "$HOME"/.cargo/bin/cargo ]; then
 		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 	fi
 
@@ -213,6 +214,7 @@ build_ttyd() {
 		"CROSS_ROOT=${workdir}/tmp.ttyd/cross"
 		"STAGE_ROOT=${workdir}/tmp.ttyd/stage"
 		"BUILD_ROOT=${workdir}/tmp.ttyd/build"
+		"ZLIB_VERSION=1.3.2" # 1.3.1 can no longer be downloaded. You may need to download zlib with a browser and put at $workdir/ttyd-$ttyd_version/ if using a VPN.
 	)
 	local out="${workdir}/tmp.ttyd/stage/${arch}-linux-musl"
 
@@ -222,7 +224,8 @@ build_ttyd() {
 	wget "${url}" -O - | tar xz
 	cp ttyd/* ttyd-${ttyd_version}/scripts
 	pushd "$workdir/ttyd-${ttyd_version}" > /dev/null
-	bash -c "env ${build_env[*]} ./scripts/cross-build.sh"
+	sed -i -r -e 's;\bcurl ([^"]*) ("([^/"]*/)*([^/"]*)");(cat \4 || (curl --retry 5 \1 \2 > \4 \&\& cat \4));g' ./scripts/cross-build.sh # cache downloaded files
+	bash -c "env ${build_env[*]} bash -x ./scripts/cross-build.sh"
 
 	if [[ "$cloud_init" == 1 ]]; then
 		mkdir -p "${chroot_ttyd}/usr/local/bin" || true
