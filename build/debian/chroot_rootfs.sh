@@ -109,7 +109,7 @@ clean_up() {
 	done
 
 	if [[ -d "${chroot_workspace}" ]]; then
-		umount -R "${chroot_workspace}" || true
+		umount -R -l "${chroot_workspace}" || true # -l fixes breakage when folder being busy
 	fi
 
 	rm -d "${chroot_workspace}"
