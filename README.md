@@ -74,8 +74,9 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [ ]  (stretch) Enable forcing the VM to use the host vpn
 - [ ] Support for multiple `vm_config.json` files for different modes (install, update, use, airgap, etc.) or just different VMs.
 - [ ] Enable trying to keep the VM alive in the background
+- [ ] Write a install guide inside the app
 - [ ]  (stretch) Add back gutted features
-    - Something to replace virtio (seamless file sharing)
+    - Something to replace virtiofs (seamless file sharing)
     - Something to replace dynamic VM storage resizing
     - Make the display work
     - Make the mouse work (offset issue)
@@ -108,10 +109,10 @@ adb shell pm grant --user ?? com.android.virtualization.koiterminal android.perm
 ```
 
 ### Obtain a VM image
-Google's official image will not work as its setup requires extra permissions to enable virtio (seamless folder sharing between host and VM).
+Google's official image will not work as its setup requires extra permissions to enable virtiofs (seamless folder sharing between host and VM).
 
 This project provides the following images (and image building guides for those wishing to customize further): <!-- UPDATE -->
-- Modified Debian from Google: [:dvd: image](https://drive.proton.me/urls/3M1QVHKA88#7mfYjRmXSRpc), [:hammer_and_wrench: building guide](build/debian/README.md)
+- Modified Debian from Google: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/debian/README.md)
 - Alpine: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/custom_vm/alpine/README.md)
 - Running ISO-based OS installer (coming soon): [:dvd: partial image](), [:page_with_curl: usage guide]()
 <!-- UPDATE each guide -->

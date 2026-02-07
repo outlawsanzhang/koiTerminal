@@ -91,19 +91,19 @@ build_custom_kernel() {
 	mkdir -p "${workdir}/kernel"
 	pushd "${workdir}/kernel" > /dev/null
 
-	wget "${ksrc_security_base_url}/${dsc_file}" || \
+	ls "${dsc_file}" || wget "${ksrc_security_base_url}/${dsc_file}" || \
 	wget "${ksrc_base_url}/${dsc_file}"
 
-	wget "${ksrc_security_base_url}/${orig_ksrc_file}" || \
+	ls "${orig_ksrc_file}" || wget "${ksrc_security_base_url}/${orig_ksrc_file}" || \
 	wget "${ksrc_base_url}/${orig_ksrc_file}"
 
-	wget "${ksrc_security_base_url}/${debian_ksrc_file}" || \
+	ls "${debian_ksrc_file}" || wget "${ksrc_security_base_url}/${debian_ksrc_file}" || \
 	wget "${ksrc_base_url}/${debian_ksrc_file}"
 
 	rsync -az --progress keyring.debian.org::keyrings/keyrings/ /usr/share/keyrings/
 
 	# 1. Verify, extract and merge patches into the original kernel sources
-	dpkg-source --require-strong-checksums \
+	ls "linux-${debian_kver%-*}" || dpkg-source --require-strong-checksums \
 	            --require-valid-signature \
 	            --extract "${dsc_file}"
 	pushd "linux-${debian_kver%-*}" > /dev/null
@@ -111,6 +111,7 @@ build_custom_kernel() {
 	local kpatches_src="$SCRIPT_DIR/kernel/patches"
 	cp -r "${kpatches_src}/avf" debian/patches/
 	cat "${kpatches_src}/series" >> debian/patches/series
+	patch -p0 < "$SCRIPT_DIR/debian-bugfix.patch"
 	./debian/rules orig
 
 	local custom_flavour="avf"
@@ -141,6 +142,10 @@ EOF
 	./debian/rules debian/control || true
 
 	# 3. Build the kernel and generate Debian packages
+	if (($(df -B1 /tmp | awk 'NR==1 { for (i = 1; i <= NF; i++) if ($i == "1B-blocks") cidx=i } NR > 1 { print $cidx }') < 2*1024*1024*1024)); then
+		# Packaging .deb uses /tmp
+		mount -o remount,size=2G /tmp
+	fi
 	./debian/rules source
 	export DEB_BUILD_PROFILES="nodoc"
 	[[ "$arch" == "$(uname -m)" ]] || export $(dpkg-architecture -a $debian_arch)

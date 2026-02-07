@@ -8,6 +8,7 @@ set -ex
 SCRIPT_DIR="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 
 remove_packages() {
+	rm /etc/kernel/postrm.d/zz-update-grub || true # fix: updating grub post-purge breaks in chroot, but we don't need grub
 	apt purge -y linux-image-*
 }
 
