@@ -1,9 +1,10 @@
 # koiTerminal
-A more permissive version of the Linux Terminal app, forked from the GrapheneOS repo, supporting custom virtual machine images (such as Alpine). Currently in proof-of-concept stage. <!-- UPDATE -->
+A more permissive version of the Linux Terminal app with finer VM permission control, forked from the GrapheneOS repo, supporting custom virtual machine images (such as Alpine). Currently in proof-of-concept stage. <!-- UPDATE -->
 
 <img src="https://raw.githubusercontent.com/outlawsanzhang/koiTerminal/refs/heads/koiterminal/assets/alpine-2026012800.jpg" width="50%" height="50%">
 
 The main goal is to allow users to install this as a non-system, standalone app on a non-rooted device, and run a full VM with a Linux image that is not provided by Google.
+And does not rely on Google's image for installation.
 Because, come on, there was a NestBox app by kdrag0n that was able to do this years ago! Unfortunately, it was not maintained and stopped working on newer OS versions.
 
 This repo also has an `upstreamable` branch that can potentially be merged into GrapheneOS, if they ever decide to do anything with it.
@@ -11,6 +12,9 @@ This repo also has an `upstreamable` branch that can potentially be merged into 
 Once this repo is in a more presentable state (>=3 distros successfully supported), this document will be rewritten to be more user-friendly instead of only dev-friendly. <!-- UPDATE -->
 
 `koi` stands for `KVM with Other Images`. Perhaps.
+
+> [!IMPORTANT]
+> This app does not yet work out-of-the-box, and does not yet have an in-app setup tutorial. Please follow the [How to use](#how-to-use) section for setup.
 
 ### Table of contents <!-- UPDATE -->
 - [Features](#added-features)
@@ -27,14 +31,14 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - Does not force you to give the VM access to all files
 - No rooting necessary, requiring only a one-time permission grant using ADB.
 - Can connect to the VM using the serial console, which enables:
+    - Booting from (almost) fresh OS installs
+    - Supporting using the `Block connections without VPN` setting
+    - Changing font size :)
     - Booting from installation media using u-boot (instructions to come) <!-- UPDATE -->
-    - Booting from fresh OS installs
     <!--
         - [!] Default u-boot is a pre-built blob from google's repo: [[https://github.com/GrapheneOS/platform_manifest/blob/2026012800/default.xml#L22][device/google/cuttlefish_prebuilts]]/[[https://android.googlesource.com/device/google/cuttlefish_prebuilts/+/refs/tags/android-16.0.0_r4/bootloader/crosvm_aarch64/][bootloader/crosvm_aarch64/u-boot.bin]]
         - Currently, the `u-boot` bootloader (which is used when neither `kernel/initrd` nor `bootloader` is specified) uses a pre-compiled blob that GrapheneOS grabbed from Google.
     --> <!-- UPDATE -->
-    - Supporting using the `Block connections without VPN` setting
-    - Changing font size :)
 
 ## Disclaimers
 - Proof-of-concept pre-alpha test-build software, provided AS-IS. Beware of sharp edges, and back up often. You have been warned.
@@ -44,9 +48,9 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
   This project does not aim to continuously support lower OS versions.
 - There is a decent chance that this will be abandonware, especially if a major part of this is upstreamed to GrapheneOS. Again, AS-IS.
 - Known sharp edges: <!-- UPDATE -->
-    - The serial console may not show and the app may need to be force stopped for it to work again.
     - Just crashes when files referenced in `vm_config.json` are not found, without indicating which.
-    - Ctrl virtual button does not work in serial console.
+    - Some images are buggy, such as Alpine having network issues.
+    - Console output (kernel messages, serial console IO) is still logged in a file. This needs to be opt-in.
 
 ## Progress and plans
 Goals are mainly targeted at things that neither Google nor GrapheneOS is inclined to do in the near future.
@@ -57,24 +61,34 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Get a modified version of Google's image to run and show its terminal
 - [X] Allow communication with the VM using the console instead of ttyd
     - Stops requiring `Block connections without VPN` to be off
-    - Allows a "raw" image to run
+    - ~~Allows a "raw" image to run~~
+      - It does not seem that many distros can run well out-of-the-box due to kernel issues, implying that special images need to be built anyway.
+        This advantage may be only useful for tinkereres.
 - [X] Make a new image that is not Debian
-- [ ] High priority FIXME for serial console
-    - [ ] Fix virtual Ctrl button
-    - [ ] Fix issue where the serial terminal cannot be closed and reopened
-    - [ ] Implement copy/paste menus for the terminal emulator from Termux
-- [ ] Make an image based on Secureblue
-    - [ ]  (stretch) Allow users to install systems themselves using iso installers, and build u-boot ourselves
+- [X] High priority FIXME for serial console
+    - [X] Fix virtual Ctrl button
+    - [X] Implement copy/paste menus for the terminal emulator from Termux
+    - [X] Fix issue where the serial terminal cannot be closed and reopened
+    - [X] Serial tab close and open
+- [X] Make an image based on Debian build script
+- [ ] Make an image based on nixos-avf
+- [ ] Make an image based on Secureblue (see also: fedora-avf-installer)
+- [ ] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
+- [ ] Stop app from messing with qcow2 disk size
+- [ ] Support for multiple `vm_config.json` files for different modes (install, update, use, airgap, etc.) or just different VMs.
+    - Template - multi AppVM scheme
+    - Template - airgap AppVM scheme
+    - Multiple distros and backups
 - [ ] FIXME for serial console
-    - [ ] Find out which kernel versions and what configurations work. How about 6.6 LTS?
     - [ ] Make pty changes work
     - [ ] Deleting folder does not work in the DocumentProvider
-    - [ ] Stop app from messing with qcow2 disk size
+    - [ ] Find out which kernel versions and what configurations work. How about 6.6 LTS?
     - [ ] "VM already exists" bug
 - [ ]  (stretch) Enable forcing the VM to use the host vpn
-- [ ] Support for multiple `vm_config.json` files for different modes (install, update, use, airgap, etc.) or just different VMs.
 - [ ] Enable trying to keep the VM alive in the background
 - [ ] Write a install guide inside the app
+- [ ] Support `images.zip` in addition to `images.tar.gz`
+- [ ]  (stretch) Compile u-boot and boot from installation media using u-boot
 - [ ]  (stretch) Add back gutted features
     - Something to replace virtiofs (seamless file sharing)
     - Something to replace dynamic VM storage resizing
@@ -92,9 +106,8 @@ Suggested by community, but either may not be easily done or Google is better su
 
 # How to use
 ### Grant permissions
-After installing, the app needs to be given access to storage and VM permissions, and for GrapheneOS, the Network permission.
+After installing, the app needs to be given access to storage and VM permissions.
 For the storage permission, go to `Settings -> Apps -> Special app access -> All files access -> koiTerminal`.
-If you are on GrapheneOS, you can use Storage Scopes and grant the `linux` folder (see below for location) instead of full storage access. <!-- UPDATE -->
 
 The VM permissions are trickier. These non-standard permissions require granting via `adb`. You can use a desktop, or use Termux as follows:
 ```
@@ -108,13 +121,28 @@ adb shell pm grant --user ?? com.android.virtualization.koiterminal android.perm
 # Don't forget to turn off wireless debugging afterwards.
 ```
 
+Special setup using GrapheneOS-specific permissions:
+- You can use Storage Scopes and grant the `linux` folder (see below for location) instead of full storage access. <!-- UPDATE -->
+- You can either keep the Network permission on, or follow these to airgap the VM and the app: <!-- UPDATE -->
+    1. Deny the Network permission to koiTerminal.
+    2. Follow the rest of this guide, but make sure to avoid VM images that do not support the serial console and rely on the network-based terminal emulator.
+    3. Wait for the app to crash after installing the VM image, with an exception that complains about missing Network permission.
+    4. Go to the exposed internal files, and change `"network": true,` to `"network": false,` in `linux/vm_config.json`.
+    5. Relaunch the app.
+
 ### Obtain a VM image
 Google's official image will not work as its setup requires extra permissions to enable virtiofs (seamless folder sharing between host and VM).
 
 This project provides the following images (and image building guides for those wishing to customize further): <!-- UPDATE -->
-- Modified Debian from Google: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/debian/README.md)
-- Alpine: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/custom_vm/alpine/README.md)
-- Running ISO-based OS installer (coming soon): [:dvd: partial image](), [:page_with_curl: usage guide]()
+- Debian built from Google's scripts: [:dvd: image](https://drive.proton.me/urls/J0ERDQ0ZZ4#w08ddfcz7zLy), [:hammer_and_wrench: building guide](build/debian/README.md)
+- (Buggy for now) Alpine: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/custom_vm/alpine/README.md)
+- (Deprecated) Modified Debian from Google: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/debian/README.md)
+
+And coming soon (probably):
+- SecureBlue inspired by [fedora-avf-installer](https://github.com/cillyvms/fedora-avf-installer): [:dvd: image](), [:hammer_and_wrench: building guide]()
+- (Note: GPL 3.0) NixOS adapted from [nixos-avf](https://github.com/nix-community/nixos-avf): [:dvd: image](), [:hammer_and_wrench: building guide]()
+- Archlinux adapted from [arch-arm64-avf](https://github.com/vitorpy/arch-arm64-avf): [:dvd: image](), [:hammer_and_wrench: building guide]()
+- Running ISO-based OS installer: [:dvd: partial image](), [:page_with_curl: usage guide]()
 <!-- UPDATE each guide -->
 
 Note that these images are built or modified so that the kernel version is closer to 6.1 or at least no higher than 6.12.
@@ -141,12 +169,12 @@ user root
 The app should automatically install the image.
 After the install, it should be able to show the terminal in at least one of two ways:
 
-(1) If the image supports ttyd (right now the only one is the Debian image from Google), then the terminal should just appear. <!-- UPDATE -->
+(1) If the image supports ttyd (right now the NixOS and Debian images), then the terminal should just appear. <!-- UPDATE -->
 If you are using a VPN, it may block the local connection used to communicate with the VM.
 Make sure to turn off `Block connections without VPN` in the system settings, and enable your VPN's local network access if it also blocks local connections.
 
-(2) If the image supports the serial console, you can press the add serial console tab button (plus sign with a tail) to connect to the VM's console.
-Right now, all images should support this method, although for the modified Debian image, kernel logs may appear on your console and make a mess. <!-- UPDATE -->
+(2) If the image supports the serial console, you can press the add serial console tab button (plus sign with a tail <img src="https://i.kym-cdn.com/entries/icons/square/000/010/566/060.png" style="height: 2em"> <!-- UPDATE -->) to connect to the VM's console.
+Right now, all images should support this method, although for the Debian images, kernel logs may occasionally appear on your console and make a mess. <!-- UPDATE -->
 This method works with the `Block connections without VPN` option and connects directly to the VM.
 Note the VM is still outside the VPN, connected straight to the Internet. <!-- UPDATE -->
 This console uses code from Termux, and inherits some of its features like zooming.
