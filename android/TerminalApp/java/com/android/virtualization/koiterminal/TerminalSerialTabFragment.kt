@@ -250,6 +250,9 @@ class TerminalSerialTabFragment() : Fragment() {
     // Serial terminal view interface
     inner class SerialViewClient(): TerminalViewClient {
 
+        public var isCtrlDown: Boolean = false
+        public var isAltDown: Boolean = false
+
         /**
          * Callback function on scale events according to {@link ScaleGestureDetector#getScaleFactor()}.
          */
@@ -295,18 +298,20 @@ class TerminalSerialTabFragment() : Fragment() {
             return false
         }
 
-        // TODO: extra key holding from virtual keyboard
+        override fun readControlKey(): Boolean { return isCtrlDown }
 
-        override fun readControlKey(): Boolean { return false }
+        override fun readAltKey(): Boolean { return isAltDown }
 
-        override fun readAltKey(): Boolean { return false }
+        // TODO: keys absent from virtual modifier keyboard
 
         override fun readShiftKey(): Boolean { return false }
 
         override fun readFnKey(): Boolean { return false }
 
         override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean {
-            // No special handling
+            // Clear button holding. This is called after read*Key() are called and logic processed.
+            isCtrlDown = false
+            isAltDown = false
             return false
         }
 
