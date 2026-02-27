@@ -30,7 +30,7 @@ or modifying the aarch64 default config.
 Copy the `build/custom_vm/generic-kernel` folder to your choice of `/path/to/builder` and invoke the script with:
 ```
 workdir=/path/to/workdir
-kernel_ver=6.1.135 # This is the one from Google's Debian image.
+kernel_ver=6.1.135 # This is the one from Google's Debian build script.
 # You can try the latest LTS, which are 6.1.161, 6.6.122, 6.12.68, and 6.18.8 at the time of writing.
 # The higher the version, the less stable it is.
 
