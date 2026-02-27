@@ -83,7 +83,7 @@ class TerminalSerialTabFragment() : Fragment() {
     }
 
     public fun disconnectTerminal() {
-        terminalView.mTermSession.disconnectTerminal()
+        terminalView.mTermSession?.disconnectTerminal()
     }
 
     override fun onCreateView(
