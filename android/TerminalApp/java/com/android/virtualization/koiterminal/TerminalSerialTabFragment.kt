@@ -17,6 +17,8 @@ package com.android.virtualization.koiterminal
 
 import android.annotation.IntDef
 import android.annotation.MainThread
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -214,9 +216,23 @@ class TerminalSerialTabFragment() : Fragment() {
 
         override fun onSessionFinished(finishedSession: TerminalSession) {}
 
-        override fun onCopyTextToClipboard(session: TerminalSession, text: String?) {}
+        override fun onCopyTextToClipboard(session: TerminalSession, text: String?) {
+            if (text == null) return
+            val clipboard = getContext()?.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            if (clipboard == null) return
+            val clip: ClipData = ClipData.newPlainText("Termux copy text", text)
+            clipboard.setPrimaryClip(clip)
+        }
 
-        override fun onPasteTextFromClipboard(session: TerminalSession?) {}
+        override fun onPasteTextFromClipboard(session: TerminalSession?) {
+            (getContext()?.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)
+                ?.primaryClip
+                ?.getItemAt(0)
+                ?.let {
+                    val text = it.coerceToText(getContext())
+                    if (!text.isEmpty()) getTerminalView()?.mEmulator?.paste(text.toString());
+                }
+        }
 
         override fun onBell(session: TerminalSession) {}
 
