@@ -268,6 +268,14 @@ public class MainActivity :
         )
     }
 
+    override fun onStart() {
+        // It seems that serialIn and serialOut do not persist beyond onStop()
+        super.onStart()
+        Log.i("$TAG-onStart()", "Querying serial console PFDs.")
+        val intent = VmLauncherService.getIntentForQuerySerial(this, this)
+        startService(intent)
+    }
+
     fun fontSize(): Float {
         val config = resources.configuration
         return config.fontScale * FONT_SIZE_DEFAULT
