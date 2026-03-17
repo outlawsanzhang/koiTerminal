@@ -38,7 +38,19 @@ cp /usr/share/AAVMF/AAVMF_{CODE,VARS}.fd ./
 Start QEMU:
 ```
 stty intr ^] # Ctrl-] for interrupting QEMU, so Ctrl-C goes to VM
-qemu-system-aarch64 -machine virt -accel tcg,thread=multi -cpu cortex-a57 -smp 2 -m 2g -nographic -drive if=pflash,file=AAVMF_CODE.fd,format=raw,readonly=on -drive if=pflash,file=AAVMF_VARS.fd,format=raw,readonly=on -drive if=virtio,file=root_volume,format=raw,cache=unsafe,discard=unmap,id=hd0 -drive if=virtio,file=install_script.sh,format=raw,readonly=on,cache=unsafe,discard=unmap,id=hd1 -drive if=virtio,file=alpine-virt-3.23.3-aarch64.iso,media=cdrom,cache=unsafe,readonly=on,id=cc -nic user; stty intr ^C # change back interrupt to Ctrl-C
+qemu-system-aarch64 \
+    -machine virt \
+    -accel tcg,thread=multi \
+    -cpu cortex-a57 \
+    -smp 2 \
+    -m 2g \
+    -nographic \
+    -drive if=pflash,file=AAVMF_CODE.fd,format=raw,readonly=on \
+    -drive if=pflash,file=AAVMF_VARS.fd,format=raw,readonly=on \
+    -drive if=virtio,file=root_volume,format=raw,cache=unsafe,discard=unmap,id=hd0 \
+    -drive if=virtio,file=install_script.sh,format=raw,readonly=on,cache=unsafe,discard=unmap,id=hd1 \
+    -drive if=virtio,file=alpine-virt-3.23.3-aarch64.iso,media=cdrom,cache=unsafe,readonly=on,id=cc \
+    -nic user; stty intr ^C # change back interrupt to Ctrl-C
 ```
 This mounts the install script as a tiny volume.
 In QEMU, input `root` as the user name. Then, in the console, run the install script:
