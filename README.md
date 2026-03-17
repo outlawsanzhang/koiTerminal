@@ -71,7 +71,7 @@ These goals may change, and they may or may not be achievable. We will have to s
     - [X] Fix issue where the serial terminal cannot be closed and reopened
     - [X] Serial tab close and open
 - [X] Make an image based on Debian build script
-- [ ] Make an image based on nixos-avf
+- [X] Make an image based on nixos-avf
 - [ ] Make an image based on Secureblue (see also: fedora-avf-installer)
 - [ ] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
 - [ ] Stop app from messing with qcow2 disk size
@@ -81,6 +81,7 @@ These goals may change, and they may or may not be achievable. We will have to s
     - Multiple distros and backups
 - [ ] FIXME for serial console
     - [ ] Make pty changes work
+    - [ ] Make mouse work in serial terminal
     - [ ] Deleting folder does not work in the DocumentProvider
     - [ ] Find out which kernel versions and what configurations work. How about 6.6 LTS?
     - [ ] "VM already exists" bug
@@ -134,16 +135,18 @@ Special setup using GrapheneOS-specific permissions:
 Google's official image will not work as its setup requires extra permissions to enable virtiofs (seamless folder sharing between host and VM).
 
 This project provides the following images (and image building guides for those wishing to customize further): <!-- UPDATE -->
-- Debian built from Google's scripts: [:dvd: image](https://drive.proton.me/urls/J0ERDQ0ZZ4#w08ddfcz7zLy), [:hammer_and_wrench: building guide](build/debian/README.md)
-- (Buggy for now) Alpine: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/custom_vm/alpine/README.md)
-- (Deprecated) Modified Debian from Google: [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN), [:hammer_and_wrench: building guide](build/debian/README.md)
+- Debian built from Google's scripts
+- NixOS adapted from [nixos-avf](https://github.com/nix-community/nixos-avf)
+- (Buggy for now) Alpine
+- (Deprecated) Modified Debian from Google
 
 And coming soon (probably):
-- SecureBlue inspired by [fedora-avf-installer](https://github.com/cillyvms/fedora-avf-installer): [:dvd: image](), [:hammer_and_wrench: building guide]()
-- (Note: GPL 3.0) NixOS adapted from [nixos-avf](https://github.com/nix-community/nixos-avf): [:dvd: image](), [:hammer_and_wrench: building guide]()
-- Archlinux adapted from [arch-arm64-avf](https://github.com/vitorpy/arch-arm64-avf): [:dvd: image](), [:hammer_and_wrench: building guide]()
-- Running ISO-based OS installer: [:dvd: partial image](), [:page_with_curl: usage guide]()
+- SecureBlue
+- Archlinux adapted from [arch-arm64-avf](https://github.com/vitorpy/arch-arm64-avf)
+- Running ISO-based OS installer
 <!-- UPDATE each guide -->
+
+Please find the links and instructions for each distribution here: [IMAGES.md](IMAGES.md)
 
 Note that these images are built or modified so that the kernel version is closer to 6.1 or at least no higher than 6.12.
 It seems from experience that anything higher than 6.6 will not run properly or straight-up refuse to boot. <!-- UPDATE -->
