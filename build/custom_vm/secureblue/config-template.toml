@@ -1,0 +1,155 @@
+# A failed attempt at building Secureblue with bootc-image-builder.
+# To run (on arm64):
+# 
+# mkdir -p output insecure
+# cat <<EOF > insecure/Containerfile
+# FROM ghcr.io/secureblue/silverblue-main-hardened:latest
+# RUN sed -i "s;reject;insecureAcceptAnything;g" /etc/containers/policy.json
+# RUN ln -s /usr/lib/systemd/system/getty@.service /etc/systemd/system/getty.target.wants/serial-getty@ttyAMA0.service
+# EOF
+# podman pull ghcr.io/secureblue/silverblue-main-hardened:latest
+# podman pull quay.io/centos-bootc/bootc-image-builder:latest # ??? trust tool??
+# podman build -t ghcr.io/secureblue/silverblue-main-hardened:insecure insecure/
+# GETTY="$(podman run --rm -it ghcr.io/secureblue/silverblue-main-hardened:latest grep ExecStart= /usr/lib/systemd/system/serial-getty@.service | sed 's;agetty ;agetty --autologin droid ;g')"
+# sed -e 's;%GETTY%;$GETTY;g' config-template.toml > config.toml
+# podman run --rm -it --privileged --pull=newer --security-opt label=type:unconfined_t -v ./output:/output -v ./config.toml:/config.toml:ro -v /var/lib/containers/storage:/var/lib/containers/storage quay.io/centos-bootc/bootc-image-builder:latest --type qcow2 --use-librepo=True --rootfs btrfs --progress verbose "ghcr.io/secureblue/silverblue-main-hardened:insecure"
+# 
+# The image boots, but does not spawn a shell on ttyAMA0. Fix needed...
+
+[[customizations.user]]
+name = "droid"
+groups = ["wheel"]
+
+[[customizations.directories]]
+path = "/etc/systemd/system/serial-getty@ttyAMA0.service.d"
+mode = "0755"
+user = "root"
+group = "root"
+ensure_parents = true
+
+[[customizations.directories]]
+path = "/etc/systemd/system/gdm.service.d"
+mode = "0755"
+user = "root"
+group = "root"
+ensure_parents = true
+
+# Post-install modifications runner
+[[customizations.files]]
+path = "/etc/run_post_install_secureblue.sh"
+mode = "0755"
+user = "root"
+group = "root"
+data = """
+    set -ex
+    echo '
+        HISTFILE= && if bash -ex /etc/post_install_secureblue.sh
+        then
+            echo "Automatically shutting down in 5 seconds..."
+            sleep 5
+            poweroff
+        else
+            echo "Error: Secureblue installer step failed."
+            echo "Press Ctrl+C to proceed to bash."
+        fi &
+        echo run0 background job PID: $!
+    ' | run0
+    sleep infinity
+"""
+
+# Post-install modifications
+[[customizations.files]]
+path = "/etc/post_install_secureblue.sh"
+mode = "0755"
+user = "root"
+group = "root"
+data = '''
+    # Recover container policy
+    echo sed -i s/insecureAcceptAnything/reject/g /etc/containers/policy.json | run0
+    # For DNS, sometimes resolved seems to work better
+    # ujust dns-selector resolver resolved
+    # Switch to a signed image (the original is installed unsigned)
+    while ! rpm-ostree rebase ostree-image-signed:docker://ghcr.io/secureblue/silverblue-main-hardened:latest; do
+        sleep 10
+    done
+    # Reset DNS to default
+    # ujust dns-selector reset
+    # https://secureblue.dev/post-install
+    echo -e 'y\ny\nn' | ujust set-kargs-hardening
+    # Reclaim space
+    while ! rpm-ostree cleanup --base --repomd --rollback; do
+        sleep 10
+    done
+    # Ensure everything is alright
+    run0 --user droid ujust audit-secureblue | tee /dev/shm/audit.log
+    if grep -i "\(hardened kernel arguments\|signed image\).*FAIL" /dev/shm/audit.log; then
+        echo "Setup incomplete."
+        exit 1
+    fi
+    # Change ttyAMA0 (used by qemu) to hvc0 (used in AVF, our vm_config.json)
+    mv /etc/systemd/system/getty.target.wants/serial-getty@{ttyAMA0,hvc0}.service
+    mv /etc/systemd/system/serial-getty@{ttyAMA0,hvc0}.service.d
+    # Revert extended timeout
+    rm -f /etc/systemd/system.conf.d/50-override.conf
+    # Clean up installing scripts
+    rm -f /etc/*install_secureblue.sh
+    # Set up first-use recommendations
+    sed -i 's;/etc/run_post_install_secureblue.sh;/var/home/droid/first_use_secureblue.sh;g' /var/home/droid/.bash_profile
+    # Clean up gdm.service core dumps
+    rm -f /var/lib/systemd/coredump/*
+'''
+
+# First-use notifications
+[[customizations.files]]
+path = "/var/home/droid/first_use_secureblue.sh"
+mode = "0755"
+user = "droid"
+group = "droid"
+data = '''
+    echo 'Running \`ujust audit-secureblue\` to provide post-install recommendations...'
+    ujust audit-secureblue
+    rm -f /var/home/droid/first_use_secureblue.sh
+    sed -i '/\/var\/home\/droid\/first_use_secureblue.sh/d' /var/home/droid/.bash_profile
+'''
+
+# Force create terminal
+[[customizations.files]]
+path = "/etc/systemd/system/serial-getty@ttyAMA0.service.d/override.conf"
+mode = "0755"
+user = "root"
+group = "root"
+data = """
+[Service]
+ExecStart=
+%GETTY%
+"""
+
+# gdm fix
+[[customizations.files]]
+path = "/etc/systemd/system/gdm.service.d/override.conf"
+mode = "0755"
+user = "root"
+group = "root"
+data = """
+[Service]
+# Gradually decrease restart speed
+RestartSec=1s
+RestartMaxDelaySec=1h
+RestartSteps=10
+[Unit]
+# 15 restarts per day
+StartLimitIntervalSec=1d
+StartLimitBurst=15
+"""
+
+# Device & service timeout fix
+[[customizations.files]]
+path = "/etc/systemd/system.conf.d/50-override.conf"
+mode = "0755"
+user = "root"
+group = "root"
+data = """
+[Manager]
+DefaultTimeoutStartSec=300
+DefaultDeviceTimeoutSec=300
+"""

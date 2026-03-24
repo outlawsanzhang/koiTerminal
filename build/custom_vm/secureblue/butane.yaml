@@ -1,0 +1,174 @@
+# This is an attempt on building Secureblue by rebasing from a Fedora CoreOS image.
+# However, it turns out that this method of installation is not tested and may have issues.
+# Therefore, this is repurposed to provide an untested example of building Securecore.
+# See: https://discussion.fedoraproject.org/t/vanilla-fedora-atomic-desktop-iso/145098/9
+# See also: https://github.com/secureblue/secureblue/blob/live/files/system/usr/share/secureblue/install_secureblue.sh#L49
+# See also: https://github.com/secureblue/secureblue/blob/live/docs/example.butane
+variant: fcos
+version: 1.6.0
+passwd:
+    users:
+        - name: droid
+          groups:
+            - wheel
+systemd:
+    units:
+        - name: serial-getty@ttyS0.service
+          mask: true
+        - name: serial-getty@hvc0.service
+          enabled: true
+          dropins:
+            - name: autologin.conf
+              # This ExecStart is based on what secureblue has in /usr/lib/systemd/system/serial-getty@.service today, adding `--autologin droid`.
+              contents: |
+                [Service]
+                TTYVTDisallocate=no
+                ExecStart=
+                ExecStart=-/sbin/agetty --autologin droid --noreset --noclear --iussue-file=/etc/issue:/etc/issue.d:/run/issue.d:/usr/lib/issue.d --keep-baud 115200,57600,38400,9600 - ${TERM}
+        - name: serial-getty@ttyAMA0.service
+          enabled: true
+          dropins:
+            - name: autologin.conf
+              # This ExecStart is based on what secureblue has in /usr/lib/systemd/system/serial-getty@.service today, adding `--autologin droid`.
+              contents: |
+                [Service]
+                TTYVTDisallocate=no
+                ExecStart=
+                ExecStart=-/sbin/agetty --autologin droid --noreset --noclear --iussue-file=/etc/issue:/etc/issue.d:/run/issue.d:/usr/lib/issue.d --keep-baud 115200,57600,38400,9600 - ${TERM}
+        # - name: koi-butane.service
+        #   enabled: true
+        #   contents: |
+        #     [Unit]
+        #     Description=First-boot installation script
+        #     ConditionPathExists=/etc/koi-butane.trigger
+        #     [Service]
+        #     Type=oneshot
+        #     RemainAfterExit=yes
+        #     ExecStart=-/etc/koi-butane.sh
+        #     [Install]
+        #     WantedBy=multi-user.target
+storage:
+    directories:
+        - path: /etc/systemd/system.conf.d
+
+    files:
+        # - path: /etc/koi-butane.trigger
+        #   contents:
+        #     inline: ""
+        # - path: /etc/koi-butane.sh
+        #   contents:
+        #     inline: |
+        #       #!/bin/bash
+        #       sudo userdel -r core
+        #       sudo rm /etc/koi-butane.trigger
+
+        - path: /etc/systemd/system.conf.d/50-override.conf
+          append:
+            inline: |
+              [Manager]
+              DefaultTimeoutStartSec=300
+              DefaultDeviceTimeoutSec=300
+
+        - path: /var/home/droid/.bash_profile
+          append:
+            inline: |
+              #!/bin/bash
+              bash /var/home/droid/install_step.sh # %TODEL%
+
+        - path: /var/home/droid/install_step.sh
+          contents:
+            inline: |
+              #!/bin/bash
+              echo '
+                  HISTFILE= && if bash -ex /var/home/droid/install_step_1.sh
+                  then
+                      echo "Automatically shutting down in 5 seconds..."
+                      sleep 5
+                      poweroff --reboot
+                  else
+                      echo "Error: Securecore installer step failed while running /var/home/droid/install_step_1.sh."
+                      echo "Press Ctrl+C to proceed to bash."
+                  fi &
+                  echo run0 background job PID: $!
+              ' | run0
+
+        - path: /var/home/droid/install_step_1.sh
+          contents:
+            inline: |
+              #!/bin/bash
+              set -ex -o pipefail
+              userdel -r core
+              while ! bootc switch ghcr.io/secureblue/securecore-main-hardened:latest; do
+                  sleep 10
+              done
+              sed -i 's;install_step_1;install_step_2;g' /var/home/droid/install_step.sh
+
+        - path: /var/home/droid/install_step_2.sh
+          contents:
+            inline: |
+              #!/bin/bash
+              set -ex -o pipefail
+
+              # ujust toggle-mac-randomization # This is probably not needed for a VM
+
+              # Switch to a signed image (the original is installed unsigned)
+              while ! rpm-ostree rebase ostree-image-signed:docker://ghcr.io/secureblue/securecore-main-hardened:latest; do
+                  sleep 10
+              done
+
+              # https://secureblue.dev/post-install
+              echo -e 'y\ny\nn' | ujust set-kargs-hardening
+              rpm-ostree kargs --append-if-missing=module.sig_enforce=1 # Potential upstream issue where this flag is left out
+              # leave out --append-if-missing=ia32_emulation=0 for now
+              sed -i 's;install_step_2;install_step_3;g' /var/home/droid/install_step.sh
+
+        - path: /var/home/droid/install_step_3.sh
+          contents:
+            inline: |
+              #!/bin/bash
+              set -ex -o pipefail
+
+              # Reclaim space. Remove anything pending as well.
+              rpm-ostree cancel
+              while ! rpm-ostree cleanup --base --repomd --rollback --pending; do
+                  sleep 10
+              done
+              podman system prune --all --force || true
+
+              # Ensure everything is alright
+              run0 --user droid ujust audit-secureblue | tee /dev/shm/audit.log
+              if grep -i "\(hardened kernel arguments\|signed image\).*FAIL" /dev/shm/audit.log; then
+                  echo "Setup incomplete."
+                  exit 1
+              fi
+
+              # Revert extended timeout
+              rm -f /etc/systemd/system.conf.d/50-override.conf
+
+              # Clean up installing scripts
+              rm -f /var/home/droid/install_step*.sh
+
+              # Set up first-use recommendations
+              sed -i 's;/var/home/droid/install_step.sh;/var/home/droid/first_use.sh;g' /var/home/droid/.bash_profile
+              cat <<EOF > /var/home/droid/first_use.sh
+                  echo 'Running \`ujust audit-secureblue\` to provide post-install recommendations...'
+                  ujust audit-secureblue --skip flatpak
+                  echo 'Audit complete. Please refer to the recommendations above.'
+                  echo
+                  sed -i '/\/var\/home\/droid\/first_use.sh/d' /var/home/droid/.bash_profile
+                  rm -f /var/home/droid/first_use.sh
+              EOF
+              chmod a+x /var/home/droid/first_use.sh
+              chown droid:droid /var/home/droid/first_use.sh
+
+              # Change the serial console from ttyAMA0 (used by qemu) to hvc0 (used in AVF, our vm_config.json)
+              # Note: using hvc0 because enabling ttyS0 results in duplicate kernel logs and login shells.
+              # FIXME: how do you turn off kernel logging to hvc0?
+              # mv /etc/systemd/system/getty.target.wants/serial-getty@{ttyAMA0,hvc0}.service
+              # mv /etc/systemd/system/serial-getty@{ttyAMA0,hvc0}.service.d
+              systemctl mask serial-getty@ttyS0.service
+              systemctl disable serial-getty@ttyAMA0.service
+
+              # Clean up gdm.service core dumps
+              rm -f /var/lib/systemd/coredump/* || true
+
