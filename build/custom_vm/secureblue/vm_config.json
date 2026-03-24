@@ -1,0 +1,40 @@
+{
+    "name": "debian",
+    "disks": [
+        {
+            "image": "$PAYLOAD_DIR/secureblue-system.qcow2",
+            "writable": true
+        },
+        {
+            "image": "$PAYLOAD_DIR/secureblue-user.qcow2",
+            "writable": true
+        },
+        {
+            "partitions": [
+                {
+                    "label": "CA_CERT",
+                    "path": "$PAYLOAD_DIR/../ca.crt",
+                    "writable": false
+                }
+            ],
+            "writable": false
+        }
+    ],
+    "sharedPath": [],
+    "bootloader": "$PAYLOAD_DIR/u-boot.bin",
+    "protected": false,
+    "cpu_topology": "match_host",
+    "platform_version": "~1.0",
+    "memory_mib": 4096,
+    "debuggable": true,
+    "connect_console": true,
+    "console_out": true,
+    "console_in": true,
+    "console_input_device": "ttyS0",
+    "network": true,
+    "auto_memory_balloon": true,
+    "gpu": {
+        "backend": "2d"
+    }
+}
+

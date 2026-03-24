@@ -1,7 +1,7 @@
 # koiTerminal
-A more permissive version of the Linux Terminal app with finer VM permission control, forked from the GrapheneOS repo, supporting custom virtual machine images (such as Alpine). Currently in proof-of-concept stage. <!-- UPDATE -->
+A more permissive version of the Linux Terminal app with finer VM permission control, forked from the GrapheneOS repo, supporting custom virtual machine images (such as Secureblue). Currently in proof-of-concept stage. <!-- UPDATE -->
 
-<img src="https://raw.githubusercontent.com/outlawsanzhang/koiTerminal/refs/heads/koiterminal/assets/alpine-2026012800.jpg" width="50%" height="50%">
+<img src="https://raw.githubusercontent.com/outlawsanzhang/koiTerminal/refs/heads/koiterminal/assets/secureblue-2026032000.jpg" width="50%" height="50%">
 
 The main goal is to allow users to install this as a non-system, standalone app on a non-rooted device, and run a full VM with a Linux image that is not provided by Google.
 And does not rely on Google's image for installation.
@@ -26,7 +26,7 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 
 ## Added features<!-- UPDATE -->
 - Boots a user-provided Linux VM image
-- Provides images for other distros (currently: Alpine)
+- Provides images for other distros (Secureblue, NixOS, Alpine)
 - Exposes VM files (configs, storage, etc.) to enable modifying VM configurations
 - Does not force you to give the VM access to all files
 - No rooting necessary, requiring only a one-time permission grant using ADB.
@@ -35,10 +35,6 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
     - Supporting using the `Block connections without VPN` setting
     - Changing font size :)
     - Booting from installation media using u-boot (instructions to come) <!-- UPDATE -->
-    <!--
-        - [!] Default u-boot is a pre-built blob from google's repo: [[https://github.com/GrapheneOS/platform_manifest/blob/2026012800/default.xml#L22][device/google/cuttlefish_prebuilts]]/[[https://android.googlesource.com/device/google/cuttlefish_prebuilts/+/refs/tags/android-16.0.0_r4/bootloader/crosvm_aarch64/][bootloader/crosvm_aarch64/u-boot.bin]]
-        - Currently, the `u-boot` bootloader (which is used when neither `kernel/initrd` nor `bootloader` is specified) uses a pre-compiled blob that GrapheneOS grabbed from Google.
-    --> <!-- UPDATE -->
 
 ## Disclaimers
 - Proof-of-concept pre-alpha test-build software, provided AS-IS. Beware of sharp edges, and back up often. You have been warned.
@@ -49,7 +45,7 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - There is a decent chance that this will be abandonware, especially if a major part of this is upstreamed to GrapheneOS. Again, AS-IS.
 - Known sharp edges: <!-- UPDATE -->
     - Just crashes when files referenced in `vm_config.json` are not found, without indicating which.
-    - Some images are buggy, such as Alpine having network issues.
+    - Some images have issues, such as Alpine having network issues, and Secureblue not shutting down properly. See [IMAGES.md](IMAGES.md) for details.
     - Console output (kernel messages, serial console IO) is still logged in a file. This needs to be opt-in.
 
 ## Progress and plans
@@ -72,14 +68,16 @@ These goals may change, and they may or may not be achievable. We will have to s
     - [X] Serial tab close and open
 - [X] Make an image based on Debian build script
 - [X] Make an image based on nixos-avf
-- [ ] Make an image based on Secureblue (see also: fedora-avf-installer)
+- [X] Make an image based on Secureblue
 - [ ] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
 - [ ] Stop app from messing with qcow2 disk size
+- [ ] Build-time signature verification for Secureblue
 - [ ] Support for multiple `vm_config.json` files for different modes (install, update, use, airgap, etc.) or just different VMs.
     - Template - multi AppVM scheme
     - Template - airgap AppVM scheme
     - Multiple distros and backups
 - [ ] FIXME for serial console
+    - [ ] Alt + Backspace etc.
     - [ ] Make pty changes work
     - [ ] Make mouse work in serial terminal
     - [ ] Deleting folder does not work in the DocumentProvider
@@ -89,7 +87,8 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [ ] Enable trying to keep the VM alive in the background
 - [ ] Write a install guide inside the app
 - [ ] Support `images.zip` in addition to `images.tar.gz`
-- [ ]  (stretch) Compile u-boot and boot from installation media using u-boot
+- [X]  (stretch) Compile u-boot
+    - [ ] Boot from installation media using u-boot
 - [ ]  (stretch) Add back gutted features
     - Something to replace virtiofs (seamless file sharing)
     - Something to replace dynamic VM storage resizing
@@ -135,21 +134,21 @@ Special setup using GrapheneOS-specific permissions:
 Google's official image will not work as its setup requires extra permissions to enable virtiofs (seamless folder sharing between host and VM).
 
 This project provides the following images (and image building guides for those wishing to customize further): <!-- UPDATE -->
+- SecureBlue
 - Debian built from Google's scripts
 - NixOS adapted from [nixos-avf](https://github.com/nix-community/nixos-avf)
 - (Buggy for now) Alpine
 - (Deprecated) Modified Debian from Google
 
 And coming soon (probably):
-- SecureBlue
 - Archlinux adapted from [arch-arm64-avf](https://github.com/vitorpy/arch-arm64-avf)
 - Running ISO-based OS installer
 <!-- UPDATE each guide -->
 
-Please find the links and instructions for each distribution here: [IMAGES.md](IMAGES.md)
+Please find the links and instructions for each distribution here: [:dvd: IMAGES.md](IMAGES.md)
 
 Note that these images are built or modified so that the kernel version is closer to 6.1 or at least no higher than 6.12.
-It seems from experience that anything higher than 6.6 will not run properly or straight-up refuse to boot. <!-- UPDATE -->
+It seems from experience that, for some devices, anything higher than 6.6 will not run properly or straight-up refuse to boot. <!-- UPDATE -->
 
 ### Place the image
 
@@ -183,75 +182,10 @@ Note the VM is still outside the VPN, connected straight to the Internet. <!-- U
 This console uses code from Termux, and inherits some of its features like zooming.
 However, each VM can have only one serial console tab, unlike the multi-tab ttyd.
 
-Just like the official Linux Terminal app, if it throws an error, or if it is stuck, try restarting the app, or use the recovery button to wipe and start over.
+Just like the official Linux Terminal app, if it throws an error, or if it is stuck, try force-stopping and restarting the app, or use the recovery button to wipe and start over.
 
 # How to build koiTerminal
-### Build the OS first
-The upstream app is designed to be a component of AOSP, and leverages system APIs such as `android.system.virtualmachine.VirtualMachineManager`.
-Therefore, it seems that this app cannot be built normally and has to be built with the OS build system.
-It used to be possible to build just the app with `UNBUNDLED_BUILD_SDKS_FROM_SOURCE=true TARGET_BUILD_APPS=VmTerminalApp m apps_only dist`,
-but that has not been working recently.
-If anyone knows why, or if anyone knows how to build this app normally, tips are greatly appreciated.
-
-Please follow the [GrapheneOS build guide](https://grapheneos.org/build) and build the OS for your device model.
-Use the version tag that corresponds to the tag in koiterminal.
-This needs a beefy machine with preferably 32GB of RAM and ~400GiB of storage (~150GiB to download, ~100GiB to check out, ~120GiB to compile, plus any swap file you create).
-On my machine that is not very beefy, compilation from scratch takes half a day.
-
-Using the instructions for `Faster builds for development use only` is fine for development as we don't need to sign the OS,
-but that will sign the apk with test keys, which everyone has.
-To use your own signature, also run `m otatools-package` to build signing tools.
-
-### Tips for building
-1. For the correct version of Node.js, you can use [nvm](https://github.com/nvm-sh/nvm).
-2. Yarn can be installed from Node.js: `npm install -g yarn`
-3. You may need to manually rename the factory image download: `mv vendor/adevtool/dl/<image>.zip.tmp vendor/adevtool/dl/<image>.zip`
-4. You may need `git config --global fetch.fsck.badTimezone ignore`
-5. Although `repo` is robust to network failures, it is not robust to running out of storage on your drive.
-
-### Tips for building in Whonix
-1. Somehow it needs `git config --global core.symlinks true`
-2. Ignore the issue with git rev-parse broken in .mk.
-    Add `torsocks_bin=/usr/bin/torsocks` to the `git` line in `vendor/google_devices/$DEVICE/adevtool-version-check.mk`
-    To figure out what the issue is, you will ned to run the wrapped command yourself to show all of stdout.
-3. For the spike of memory usage, you can use a swap file: `# swapon ~/swap.tmp`
-
-### Build koiTerminal
-Please finish building the whole OS before following the rest of this guide.
-
-After building the OS, change the Virtualization package to this repo:
-```
-cd packages/modules/Virtualization
-git remote add koiterminal https://github.com/outlawsanzhang/koiTerminal.git
-git fetch koiterminal
-git checkout koiterminal
-cd ../../..
-```
-
-Then, build the OS again. This should be a lot quicker than the first time.
-When it completes, the app should be produced at `out/target/product/$DEVICE/apex/com.android.virt/priv-app/VmTerminalApp@*/VmTerminalApp.apk`.
-
-### Sign the build
-Using the test key means anyone can update your app into anything else.
-It is best to sign the apk with your own key.
-
-First, generate your keystore if you do not have one.
-```
-DEVICE=... # fill your device here
-CN=... # fill your name here
-keytool -genkeypair -alias VmTerminalApp -keyalg RSA -keysize 4096 -validity 10000 -keystore keys/$DEVICE/vm-app-signing.jks -dname "CN=$CN"
-```
-You can sign the app with apksigner:
-```
-DEVICE=... # fill your device here
-RELEASE_OUT=releases/$BUILD_NUMBER/release-$DEVICE-$BUILD_NUMBER
-
-rm -rf $RELEASE_OUT
-mkdir -p $RELEASE_OUT
-
-cp out/target/product/$DEVICE/apex/com.android.virt/priv-app/VmTerminalApp@*/VmTerminalApp.apk $RELEASE_OUT/VmTerminalApp.apk
-apksigner sign --ks keys/$DEVICE/vm-app-signing.jks $RELEASE_OUT/VmTerminalApp.apk
-```
+Please see [BUILD.md](BUILD.md).
 
 # Misc
 ### License
