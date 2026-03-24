@@ -1,3 +1,40 @@
+# Secureblue
+The image is built according to the official recommendation (rebase from a Fedora Atomic install).
+Hats off to their very recent ARM support.
+### Known issues
+> [!IMPORTANT]
+> Due to kernel version issues, the default boot option will not work on some devices (such as the 8-th generation Pixels).
+> If Secureblue does not boot, please use the serial terminal to select the second boot option (labeled `ostree:1`),
+> which uses an older kernel. Afterwards, run `echo rpm-ostree cleanup --pending | run0` to remove the incompatible option.
+> 
+> Note that using the older kernel is a security degredation that introduces 1+ year of unpatched vulnerability.
+
+1. Build script does not yet verify Secureblue signatures, so ghcr.io (GitHub) is currently a trusted party.
+1. Port forwarding has not been ported, but Internet should work.
+1. Automatic VM shutdown on app close has not been ported. Please shutdown within the VM after use (`run0 poweroff`).
+   When in doubt, please force stop the app in `Settings > Apps > koiTerminal` to force a shutdown.
+1. Display feature has not been ported.
+1. The web-based terminal (ttyd) has not been ported.
+1. Features requiring kernel patches (such as dynamic memory) are not ported.
+1. Image resizing has not been disabled.
+1. The "/mnt/backup" recovery option does not work.
+
+### Tips
+1. Please follow the [post-install recommendations](https://secureblue.dev/post-install) (displayed in the terminal on first boot as well),
+   especially [setting up a separate admin account](https://secureblue.dev/post-install#wheel).
+1. The automatic updates are large and may consume a lot of mobile data if not on WiFi.
+1. For your convenience, the disks are split between `secureblue-system.qcow2` and `secureblue-user.qcow2`.
+   It is possible to duplicate the latter and install different software on different user disks,
+   potentially with some software airgapped.
+   Unfortunately, Fedora Atomic does not allow `/etc` to be a mount point and it has to be read-write,
+   so making `-system` read-only does not work.
+   Additionally, please note that Secureblue does not claim to provide anonymity or anti-fingerprinting benefits,
+   and desktop Linux is generally bad at sandboxing.
+
+### VM image
+- [:dvd: image](https://drive.proton.me/urls/Y02GSZFJV8#Y3AMG5zub5Wv)
+- [:hammer_and_wrench: building guide](build/custom_vm/secureblue/README.md)
+
 # NixOS
 The build script is adapted from [`nixos-avf`](https://github.com/nix-community/nixos-avf), and the image is similar to the one provided there.
 ### Known issues
@@ -10,7 +47,7 @@ The build script is adapted from [`nixos-avf`](https://github.com/nix-community/
 1. The upstream build script uses the GPL 3.0 license. The adapted script cannot be provided here, and is forked to a [separate repository](https://github.com/outlawsanzhang/nixos-avf-koiTerminal?tab=readme-ov-file).
 
 ### VM image
-- [:dvd: image](https://drive.proton.me/urls/J0ERDQ0ZZ4#w08ddfcz7zLy)
+- [:dvd: image](https://github.com/outlawsanzhang/nixos-avf-koiTerminal/releases)
 - [:hammer_and_wrench: building guide](https://github.com/outlawsanzhang/nixos-avf-koiTerminal?tab=readme-ov-file#building-initial-image-optional-for-development)
 
 # Debian
@@ -28,9 +65,13 @@ Currently, fixing the Alpine image is put on hold to work on other images.
 ### Known issues
 1. Network is not working.
 1. Port forwarding has not been ported.
+1. Automatic VM shutdown has not been ported. Please force stop the app in `Settings > Apps > koiTerminal` to force a shutdown.
 1. Display feature has not been ported.
+1. The web-based terminal (ttyd) has not been ported.
 1. Features requiring kernel patches (such as dynamic memory) are not ported.
 1. Custom kernel is needed, which breaks updates within the VM.
+1. Image resizing has not been disabled.
+1. The "/mnt/backup" recovery option does not work.
 
 ### VM image
 - [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN)
