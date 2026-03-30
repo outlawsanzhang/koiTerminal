@@ -78,6 +78,7 @@ class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) 
                         atv.enableCtrlKey()
                     }
                     is TermuxTerminalView -> {
+                        // Ctrl special treatment for serial console
                         val keyStateInterface = atv.mClient as TerminalSerialTabFragment.SerialViewClient
                         keyStateInterface?.isCtrlDown = true
                     }
@@ -96,6 +97,7 @@ class ModifierKeysController(val activity: MainActivity, val parent: ViewGroup) 
                         is TermuxTerminalView -> {
                             val keyStateInterface = atv.mClient as TerminalSerialTabFragment.SerialViewClient
                             if (v.id == R.id.btn_alt) {
+                                // Alt special treatment for serial console
                                 keyStateInterface?.isAltDown = true
                             } else {
                                 atv.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))

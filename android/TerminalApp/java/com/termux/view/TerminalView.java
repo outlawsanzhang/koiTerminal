@@ -372,7 +372,11 @@ public final class TerminalView extends View {
                 }
                 // The stock Samsung keyboard with 'Auto check spelling' enabled sends leftLength > 1.
                 KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
-                for (int i = 0; i < leftLength; i++) sendKeyEvent(deleteKey);
+                for (int i = 0; i < leftLength; i++)
+                    // get mClient to handle DEL (e.g. releasing Alt upon Alt+BKSP)
+                    // codePoint = 127; // DEL
+                    if (!mClient.onCodePoint(127, mClient.readControlKey(), mTermSession))
+                        sendKeyEvent(deleteKey);
                 return super.deleteSurroundingText(leftLength, rightLength);
             }
 

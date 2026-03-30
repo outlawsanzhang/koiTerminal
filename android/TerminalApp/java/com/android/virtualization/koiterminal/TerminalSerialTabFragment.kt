@@ -305,7 +305,8 @@ class TerminalSerialTabFragment() : Fragment() {
         }
 
         override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean {
-            // No special handling
+            // This is called with hardware key presses and occasionally software (e.g. AOSP keyboard Enter and Backspace)
+            if (!KeyEvent.isModifierKey(keyCode)) clearVirtualModifiers()
             return false
         }
 
@@ -325,10 +326,15 @@ class TerminalSerialTabFragment() : Fragment() {
         override fun readFnKey(): Boolean { return false }
 
         override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean {
-            // Clear button holding. This is called after read*Key() are called and logic processed.
+            // This is called after read*Key() are called and logic processed.
+            clearVirtualModifiers()
+            return false
+        }
+
+        fun clearVirtualModifiers() {
+            // Clear button holding.
             isCtrlDown = false
             isAltDown = false
-            return false
         }
 
         override fun onEmulatorSet() {}
