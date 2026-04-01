@@ -418,6 +418,8 @@
     <string name="upgrade_title">Upgrade to newer terminal</string>
     <!-- Upgrade page's description. Tell users that can't use as-is, and also explains next step. (/mnt/backup is the path which is supposed not to be translated) [CHAR LIMIT=none] -->
     <string name="upgrade_desc">Linux terminal you were using is out of date. Please upgrade to proceed.\nData will be backed at <xliff:g id="path" example="/mnt/backup">/mnt/backup</xliff:g></string>
+    <!-- Upgrade page's description. Tell users that can't use as-is, and also explains next step. No backup and users need to do that themselves. [CHAR LIMIT=none] -->
+    <string name="upgrade_desc_nobackup">Linux terminal you were using is out of date. Please *manually* back up your data, and then upgrade to proceed. DATA WILL BE LOST.</string>
     <!-- Upgrade page's button to start upgrade. [CHAR LIMIT=16] -->
     <string name="upgrade_btn_upgrade">Upgrade</string>
     <!-- Upgrade page's error toast message when upgrade failed. [CHAR LIMIT=none] -->

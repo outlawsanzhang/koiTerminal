@@ -45,7 +45,7 @@
         android:id="@+id/desc"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/upgrade_desc"
+        android:text="@string/upgrade_desc_nobackup"
         android:lineSpacingExtra="5sp"
         android:layout_marginTop="20dp"
         android:layout_marginHorizontal="48dp"
