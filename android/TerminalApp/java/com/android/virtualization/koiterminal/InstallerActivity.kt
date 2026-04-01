@@ -16,6 +16,8 @@
 package com.android.virtualization.koiterminal
 
 import android.annotation.MainThread
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
@@ -31,6 +33,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.CheckBox
 import android.widget.TextView
+import android.widget.Toast
 import com.android.internal.annotations.VisibleForTesting
 import com.android.virtualization.koiterminal.ImageArchive.Companion.fromSdCard
 import com.android.virtualization.koiterminal.ImageArchive.Companion.getDefault
@@ -44,8 +47,7 @@ import java.lang.Exception
 import java.lang.ref.WeakReference
 
 public class InstallerActivity : BaseActivity() {
-    private lateinit var waitForWifiCheckbox: CheckBox
-    private lateinit var installButton: TextView
+    private lateinit var tutorialButton: TextView
 
     private var service: IInstallerService? = null
     private var installerServiceConnection: ServiceConnection? = null
@@ -63,13 +65,24 @@ public class InstallerActivity : BaseActivity() {
         installProgressListener = InstallProgressListener(this)
 
         setContentView(R.layout.activity_installer)
-        updateSizeEstimation(ESTIMATED_IMG_SIZE_BYTES)
+        updateSizeEstimation(0)
         measureImageSizeAndUpdateDescription()
 
-        waitForWifiCheckbox = findViewById<CheckBox>(R.id.installer_wait_for_wifi_checkbox)
-        installButton = findViewById<TextView>(R.id.installer_install_button)
+        tutorialButton = findViewById<TextView>(R.id.installer_tutorial_button)
 
-        installButton.setOnClickListener(View.OnClickListener { requestInstall() })
+        tutorialButton.setOnClickListener(View.OnClickListener {
+            // copy link to clipboard
+            (getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager)?.let { clipboard ->
+                val clip = ClipData.newPlainText("Tutorial webpage URL", TUTORIAL_LINK_URL)
+                clipboard.setPrimaryClip(clip)
+            }
+            R.string.installer_link_copied_text
+            Toast.makeText(
+                this,
+                R.string.installer_link_copied_text,
+                Toast.LENGTH_SHORT,
+            ).show()
+        })
 
         val intent = Intent(this, InstallerService::class.java)
         installerServiceConnection = InstallerServiceConnection(this)
@@ -80,7 +93,7 @@ public class InstallerActivity : BaseActivity() {
 
     private fun updateSizeEstimation(est: Long) {
         val desc =
-            getString(R.string.installer_desc_text_format, Formatter.formatShortFileSize(this, est))
+            getString(R.string.local_installer_desc_text_format, if (est != 0L) Formatter.formatShortFileSize(this, est) else ESTIMATED_IMG_SIZE)
         runOnUiThread {
             val view = findViewById<TextView>(R.id.installer_desc)
             view.text = desc
@@ -139,7 +152,7 @@ public class InstallerActivity : BaseActivity() {
 
     private fun showSnackBar(message: String, length: Int) {
         val snackBar = Snackbar.make(findViewById<View>(android.R.id.content), message, length)
-        snackBar.anchorView = waitForWifiCheckbox
+        snackBar.anchorView = tutorialButton
         snackBar.show()
     }
 
@@ -163,15 +176,14 @@ public class InstallerActivity : BaseActivity() {
     }
 
     private fun setInstallEnabled(enabled: Boolean) {
-        installButton.setEnabled(enabled)
-        waitForWifiCheckbox.setEnabled(enabled)
+        tutorialButton.setEnabled(enabled)
         val progressBar = findViewById<LinearProgressIndicator>(R.id.installer_progress)
         progressBar.visibility = if (enabled) View.INVISIBLE else View.VISIBLE
 
         val resId =
-            if (enabled) R.string.installer_install_button_enabled_text
-            else R.string.installer_install_button_disabled_text
-        installButton.text = getString(resId)
+            if (enabled) R.string.installer_tutorial_button_enabled_text
+            else R.string.installer_tutorial_button_disabled_text
+        tutorialButton.text = getString(resId)
     }
 
     @MainThread
@@ -180,7 +192,7 @@ public class InstallerActivity : BaseActivity() {
 
         if (service != null) {
             try {
-                service!!.requestInstall(waitForWifiCheckbox.isChecked)
+                service!!.requestInstall(false)
             } catch (e: RemoteException) {
                 handleInternalError(e)
             }
@@ -292,6 +304,7 @@ public class InstallerActivity : BaseActivity() {
 
     companion object {
         private val AUTO_INSTALL_EXTRA = "AUTO_INSTALL"
-        private val ESTIMATED_IMG_SIZE_BYTES = FileUtils.parseSize("550MB")
+        private val ESTIMATED_IMG_SIZE = "~GB"
+        val TUTORIAL_LINK_URL = "https://github.com/outlawsanzhang/koiTerminal#how-to-use"
     }
 }
