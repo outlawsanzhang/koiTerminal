@@ -71,6 +71,7 @@ import com.android.virtualization.koiterminal.new2.core.Installer
 import com.android.virtualization.koiterminal.new2.ui.main.DisplayState
 import com.android.virtualization.koiterminal.new2.ui.main.MainUiState
 import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
@@ -139,6 +140,14 @@ fun MainScreen(viewModel: MainViewModel) {
                     when (val state = lastValidState) {
                         is MainUiState.Ready -> {
                             // VM will soon be booting
+                            LaunchedEffect(lastValidState) {
+                                // ... unless it is stuck
+                                delay(2000)
+                                if (uiState is MainUiState.Ready) {
+                                    Log.d("MainScreen", "UI stuck in MainUiState.Ready for 2 seconds. Reinitializing Installer.")
+                                    Installer.initialize(context)
+                                }
+                            }
                         }
                         is MainUiState.Stopped -> {
                             // Activity will finish
