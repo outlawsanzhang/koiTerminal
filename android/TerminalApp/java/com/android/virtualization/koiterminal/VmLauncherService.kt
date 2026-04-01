@@ -173,8 +173,16 @@ class VmLauncherService : Service() {
         // Convert rootfs disk into a sparse file for storage ballooning.
         truncateDiskIfNecessary(image)
 
-        val port = startDebianServer()
-        customImageConfigBuilder.addParam("debian_server_port=$port")
+        try {
+            val port = startDebianServer()
+            customImageConfigBuilder.addParam("debian_server_port=$port")
+        } catch (e: RuntimeException) {
+            // Ignore if failed due to revoked NETWORK permission on GrapheneOS
+            Log.d(TAG, "Guest control server cannot be started: ${e.message}, ${e.cause}")
+            if (e.message?.contains(Regex("""grpc server""")) == false) {
+                throw e
+            }
+        }
 
         customImageConfigBuilder.setAudioConfig(
             AudioConfig.Builder().setUseSpeaker(true).setUseMicrophone(true).build()
@@ -188,7 +196,22 @@ class VmLauncherService : Service() {
             try {
                 Runner.create(this, config)
             } catch (e: VirtualMachineException) {
-                throw RuntimeException("cannot create runner", e)
+                // Check for denied Network permission (on GrapheneOS)
+                val serviceSpecificException = e.cause
+                if (serviceSpecificException?.message?.contains(Regex("""does not have the android\.permission\.INTERNET permission""")) == true) {
+                    // Override network to false
+                    customImageConfigBuilder.useNetwork(false)
+                    configBuilder.setCustomImageConfig(customImageConfigBuilder.build())
+                    val config = configBuilder.build()
+                    // try again
+                    try {
+                        Runner.create(this, config)
+                    } catch (e: VirtualMachineException) {
+                        throw RuntimeException("cannot create runner", e)
+                    }
+                } else {
+                    throw RuntimeException("cannot create runner", e)
+                }
             }
 
         val virtualMachine = runner!!.vm
