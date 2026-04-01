@@ -40,18 +40,13 @@ class SettingsRecoveryActivity : AppCompatActivity() {
 
         setContentView(R.layout.settings_recovery)
 
+        val defaultImage = InstalledImage.getDefault(this)
         val resetCard = findViewById<MaterialCardView>(R.id.settings_recovery_reset_card)
         resetCard.setOnClickListener {
             var backupRootfs = false
             val dialog =
                 MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.settings_recovery_reset_dialog_title)
-                    .setMultiChoiceItems(
-                        arrayOf(getString(R.string.settings_recovery_reset_dialog_backup_option)),
-                        booleanArrayOf(backupRootfs),
-                    ) { _, _, checked ->
-                        backupRootfs = checked
-                    }
                     .setPositiveButton(R.string.settings_recovery_reset_dialog_confirm) { _, _ ->
                         // This coroutine will be killed when the activity is killed. Either
                         // finishing removing or not is acceptable behavior.
@@ -61,12 +56,20 @@ class SettingsRecoveryActivity : AppCompatActivity() {
                         ->
                         dialog.dismiss()
                     }
-                    .create()
-            dialog.show()
+            if (defaultImage.hasRootPart() && defaultImage.getPhysicalSize() > 0) {
+                dialog
+                    .setMultiChoiceItems(
+                        arrayOf(getString(R.string.settings_recovery_reset_dialog_backup_option)),
+                        booleanArrayOf(backupRootfs),
+                    ) { _, _, checked ->
+                        backupRootfs = checked
+                    }
+            }
+            dialog.create().show()
         }
         val resetBackupCard = findViewById<View>(R.id.settings_recovery_reset_backup_card)
 
-        resetBackupCard.isVisible = InstalledImage.getDefault(this).hasBackup()
+        resetBackupCard.isVisible = defaultImage.hasBackup()
 
         resetBackupCard.setOnClickListener {
             val dialog =

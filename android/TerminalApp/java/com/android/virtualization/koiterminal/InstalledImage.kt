@@ -42,6 +42,11 @@ public class InstalledImage private constructor(val installDir: Path) {
     /** The build ID of the installed image */
     val buildId: String by lazy { readBuildId() }
 
+    /** Tests if this InstalledImage uses the root partition file. */
+    fun hasRootPart(): Boolean {
+        return Files.exists(rootPartition)
+    }
+
     /** Tests if this InstalledImage is actually installed. */
     fun isInstalled(): Boolean {
         return Files.exists(marker)
@@ -80,7 +85,9 @@ public class InstalledImage private constructor(val installDir: Path) {
     @Throws(IOException::class)
     fun uninstallAndBackup(): Path {
         Files.delete(marker)
-        Files.move(rootPartition, backupFile, StandardCopyOption.REPLACE_EXISTING)
+        if (hasRootPart()) {
+            Files.move(rootPartition, backupFile, StandardCopyOption.REPLACE_EXISTING)
+        }
         return backupFile
     }
 
@@ -95,39 +102,33 @@ public class InstalledImage private constructor(val installDir: Path) {
 
     @Throws(IOException::class)
     fun getApparentSize(): Long {
-        return Files.size(rootPartition)
+        if (hasRootPart()) {
+            return Files.size(rootPartition)
+        } else {
+            return 0L
+        }
     }
 
     @Throws(IOException::class)
     fun getPhysicalSize(): Long {
-        val stat = RandomAccessFile(rootPartition.toFile(), "rw").use { raf -> Os.fstat(raf.fd) }
-        // The unit of st_blocks is 512 byte in Android.
-        return 512L * stat.st_blocks
+        if (hasRootPart()) {
+            val stat = RandomAccessFile(rootPartition.toFile(), "rw").use { raf -> Os.fstat(raf.fd) }
+            // The unit of st_blocks is 512 byte in Android.
+            return 512L * stat.st_blocks
+        } else {
+            return 0L
+        }
     }
 
     @Throws(IOException::class)
     fun getSmallestSizePossible(): Long {
-        runE2fsck(rootPartition)
-        val p: String = rootPartition.toAbsolutePath().toString()
-        val result = runCommand("/system/bin/resize2fs", "-P", p)
-        val regex = "Estimated minimum size of the filesystem: ([0-9]+)".toRegex()
-        val matchResult = result.lines().firstNotNullOfOrNull { regex.find(it) }
-        if (matchResult != null) {
-            try {
-                val size = matchResult.groupValues[1].toLong()
-                // The return value is the number of 4k block
-                return roundUp(size * 4 * 1024)
-            } catch (e: NumberFormatException) {
-                // cannot happen
-            }
-        }
-        val msg = "Failed to get min size, p=$p, result=$result"
-        Log.e(TAG, msg)
-        throw RuntimeException(msg)
+        // No permission. Skip.
+        return getApparentSize()
     }
 
     @Throws(IOException::class)
     fun resize(desiredSize: Long): Long {
+        if (!hasRootPart()) return getApparentSize()
         val roundedUpDesiredSize = roundUp(desiredSize)
         val curSize = getApparentSize()
 
@@ -148,6 +149,7 @@ public class InstalledImage private constructor(val installDir: Path) {
 
     @Throws(IOException::class)
     private fun allocateSpace(sizeInBytes: Long): Boolean {
+        if (!hasRootPart()) return false
         val curSizeInBytes = getApparentSize()
         try {
             RandomAccessFile(rootPartition.toFile(), "rw").use { raf ->
@@ -169,20 +171,13 @@ public class InstalledImage private constructor(val installDir: Path) {
 
     @Throws(IOException::class)
     fun shrinkToMinimumSize(): Long {
-        // Fix filesystem before resizing.
-        runE2fsck(rootPartition)
-
-        val p: String = rootPartition.toAbsolutePath().toString()
-        runCommand("/system/bin/resize2fs", "-M", p)
-        Log.d(TAG, "resize2fs -M completed: $rootPartition")
-
-        // resize2fs may result in an inconsistent filesystem state. Fix with e2fsck.
-        runE2fsck(rootPartition)
+        // No permission. Skip.
         return getApparentSize()
     }
 
     @Throws(IOException::class)
     fun truncate(size: Long) {
+        if (!hasRootPart()) return
         try {
             RandomAccessFile(rootPartition.toFile(), "rw").use { raf -> Os.ftruncate(raf.fd, size) }
             Log.d(TAG, "Truncated space to: $size bytes")
@@ -212,21 +207,22 @@ public class InstalledImage private constructor(val installDir: Path) {
         @Throws(IOException::class)
         private fun runE2fsck(path: Path) {
             val p: String = path.toAbsolutePath().toString()
-            runCommand("/system/bin/e2fsck", "-y", "-f", p)
-            Log.d(TAG, "e2fsck completed: $path")
+            try {
+                runCommand("/system/bin/e2fsck", "-y", "-f", p)
+                Log.d(TAG, "e2fsck completed: $path")
+            } catch (e: Exception) {
+                when (e) {
+                    is RuntimeException,
+                    is IOException -> Log.d(TAG, "e2fsck failed: $path", e)
+                    else -> throw e
+                }
+            }
         }
 
         @Throws(IOException::class)
         private fun resizeFilesystem(path: Path, sizeInBytes: Long) {
-            val sizeInMB = sizeInBytes / (1024 * 1024)
-            if (sizeInMB == 0L) {
-                Log.e(TAG, "Invalid size: $sizeInBytes bytes")
-                throw IllegalArgumentException("Size cannot be zero MB")
-            }
-            val sizeArg = sizeInMB.toString() + "M"
-            val p: String = path.toAbsolutePath().toString()
-            runCommand("/system/bin/resize2fs", p, sizeArg)
-            Log.d(TAG, "resize2fs completed: $path, size: $sizeArg")
+            // No permission. Skip.
+            Log.d(TAG, "resize2fs skipped: $path")
         }
 
         @Throws(IOException::class)

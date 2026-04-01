@@ -166,9 +166,8 @@ rm sparse/secureblue-user.qcow2
 
 ls -l secureblue*.qcow2 sparse
 
-touch root_part
 if [ -e build_id ] && [ -e vm_config.json ] && [ -e u-boot.bin ]; then
-    tar czf images.tar.gz root_part build_id vm_config.json u-boot.bin secureblue-user.qcow2 secureblue-system.qcow2
+    tar czf images.tar.gz build_id vm_config.json u-boot.bin secureblue-user.qcow2 secureblue-system.qcow2
     # gzip -9 images.tar
     ls -l "${output}"
 else
@@ -177,6 +176,6 @@ else
         - build_id
         - vm_config.json
         - u-boot.bin
-        Then run `tar czf "'${output}'" root_part build_id vm_config.json u-boot.bin secureblue-user.qcow2 secureblue-system.qcow2`.
+        Then run `tar czf "'${output}'" build_id vm_config.json u-boot.bin secureblue-user.qcow2 secureblue-system.qcow2`.
     '
 fi
