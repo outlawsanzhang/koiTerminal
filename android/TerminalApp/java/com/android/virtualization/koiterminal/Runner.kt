@@ -63,7 +63,7 @@ internal class Runner private constructor(val vm: VirtualMachine, callback: Call
     companion object {
         /** Create a virtual machine of the given config, under the given context. */
         @Throws(VirtualMachineException::class)
-        fun create(context: Context, config: VirtualMachineConfig): Runner {
+        fun create(context: Context, config: VirtualMachineConfig, prevVmRunningCallback: () -> Unit): Runner {
             // context may already be the app context, but calling this again is not harmful.
             // See b/359439878 on why vmm should be obtained from the app context.
             val appContext = context.getApplicationContext()
@@ -89,6 +89,7 @@ internal class Runner private constructor(val vm: VirtualMachine, callback: Call
                 }
             if (oldVm != null) {
                 if (oldVm.getStatus() != VirtualMachine.STATUS_STOPPED) {
+                    prevVmRunningCallback()
                     val cb = Callback()
                     Log.i(TAG, "Virtual machine ($name) is running. Waiting for it to stop.")
                     oldVm.setCallback(ForkJoinPool.commonPool(), cb)

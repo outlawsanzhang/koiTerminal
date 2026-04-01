@@ -198,6 +198,8 @@ class SettingsDiskResizeActivity : AppCompatActivity() {
 
                     override fun onVmError() {}
 
+                    override fun onPrevVmRunning() {}
+
                     override fun onTtydTimeout() {}
                 },
             )
