@@ -1,3 +1,6 @@
+> [!NOTE]
+> Please update to the latest app version before using newer VM images.
+
 # Secureblue
 The image is built according to the official recommendation (rebase from a Fedora Atomic install).
 Hats off to their very recent ARM support.

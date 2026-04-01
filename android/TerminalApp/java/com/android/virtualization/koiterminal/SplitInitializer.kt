@@ -41,7 +41,7 @@ class SplitInitializer : Initializer<RuleController> {
                 )
             )
 
-        if (Flags.terminalStorageBalloon()) {
+        if (!Flags.terminalStorageBalloon()) {
             filters.add(
                 SplitPairFilter(
                     ComponentName(context, SettingsActivity::class.java),
@@ -77,28 +77,27 @@ class SplitInitializer : Initializer<RuleController> {
                 .setMinWidthDp(context.resources.getInteger(R.integer.split_min_width))
                 .build()
 
-        val placeholderRule =
-            SplitPlaceholderRule.Builder(
-                    setOf(
-                        ActivityFilter(ComponentName(context, SettingsActivity::class.java), null)
-                    ),
-                    Intent(context, SettingsDiskResizeActivity::class.java),
-                )
-                .setFinishPrimaryWithPlaceholder(SplitRule.FinishBehavior.ADJACENT)
-                .setDefaultSplitAttributes(
-                    SplitAttributes.Builder()
-                        .setLayoutDirection(SplitAttributes.LayoutDirection.LOCALE)
-                        .setSplitType(
-                            SplitAttributes.SplitType.ratio(
-                                context.resources.getFloat(R.dimen.activity_split_ratio)
-                            )
+        val placeholderRule = SplitPlaceholderRule.Builder(
+                setOf(
+                    ActivityFilter(ComponentName(context, SettingsActivity::class.java), null)
+                ),
+                Intent(context, SettingsPortForwardingActivity::class.java),
+            )
+            .setFinishPrimaryWithPlaceholder(SplitRule.FinishBehavior.ADJACENT)
+            .setDefaultSplitAttributes(
+                SplitAttributes.Builder()
+                    .setLayoutDirection(SplitAttributes.LayoutDirection.LOCALE)
+                    .setSplitType(
+                        SplitAttributes.SplitType.ratio(
+                            context.resources.getFloat(R.dimen.activity_split_ratio)
                         )
-                        .build()
-                )
-                .setMaxAspectRatioInPortrait(EmbeddingAspectRatio.ALWAYS_ALLOW)
-                .setMinWidthDp(context.resources.getInteger(R.integer.split_min_width))
-                .setSticky(false)
-                .build()
+                    )
+                    .build()
+            )
+            .setMaxAspectRatioInPortrait(EmbeddingAspectRatio.ALWAYS_ALLOW)
+            .setMinWidthDp(context.resources.getInteger(R.integer.split_min_width))
+            .setSticky(false)
+            .build()
 
         val ruleController = RuleController.getInstance(context)
         ruleController.addRule(splitPairRules)
