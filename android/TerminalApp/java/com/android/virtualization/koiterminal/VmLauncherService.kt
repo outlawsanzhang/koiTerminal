@@ -245,7 +245,22 @@ class VmLauncherService : Service() {
             try {
                 Runner.create(this, config)
             } catch (e: VirtualMachineException) {
-                throw RuntimeException("cannot create runner", e)
+                // Check for denied Network permission (on GrapheneOS)
+                val serviceSpecificException = e.cause
+                if (serviceSpecificException?.message?.contains(Regex("""does not have the android\.permission\.INTERNET permission""")) == true) {
+                    // Override network to false
+                    customImageConfigBuilder.useNetwork(false)
+                    configBuilder.setCustomImageConfig(customImageConfigBuilder.build())
+                    val config = configBuilder.build()
+                    // try again
+                    try {
+                        Runner.create(this, config)
+                    } catch (e: VirtualMachineException) {
+                        throw RuntimeException("cannot create runner", e)
+                    }
+                } else {
+                    throw RuntimeException("cannot create runner", e)
+                }
             }
 
         val virtualMachine = runner!!.vm
