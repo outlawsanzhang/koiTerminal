@@ -146,7 +146,7 @@ private fun InstallScreenHeader(
     if (showDescription) {
         val desc =
             if (isUpgrade) {
-                stringResource(R.string.upgrade_desc, "/mnt/backup")
+                stringResource(R.string.upgrade_desc_nobackup)
             } else {
                 stringResource(R.string.installer_desc, formattedSize)
             }
