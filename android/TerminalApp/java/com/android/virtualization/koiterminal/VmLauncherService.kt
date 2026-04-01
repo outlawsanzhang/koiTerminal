@@ -73,6 +73,7 @@ class VmLauncherService : Service() {
     private lateinit var bgThreads: ExecutorService
     // Single thread
     private lateinit var mainWorkerThread: ExecutorService
+    private var mainWorkerThreadDoingStart: Boolean = false
     private lateinit var image: InstalledImage
 
     // TODO: using lateinit for some fields to avoid null
@@ -84,6 +85,7 @@ class VmLauncherService : Service() {
     private var portNotifier: PortNotifier? = null
     private var runner: Runner? = null
     private var handler: Handler? = null
+    private var shuttingDown: Boolean = false
 
     interface VmLauncherServiceCallback {
         fun onVmStart()
@@ -98,6 +100,8 @@ class VmLauncherService : Service() {
 
         fun onVmError()
         
+        fun onPrevVmRunning()
+        
         fun onTtydTimeout()
     }
 
@@ -106,12 +110,14 @@ class VmLauncherService : Service() {
     }
 
     override fun onCreate() {
+        Log.i("$TAG-VmLauncherService", "onCreate")
         super.onCreate()
         val threadFactory = TerminalThreadFactory(applicationContext)
         bgThreads = Executors.newCachedThreadPool(threadFactory)
         mainWorkerThread = Executors.newSingleThreadExecutor(threadFactory)
         image = InstalledImage.getDefault(this)
         handler = Handler(Looper.getMainLooper())
+        shuttingDown = false
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
@@ -123,27 +129,39 @@ class VmLauncherService : Service() {
 
         when (intent.action) {
             ACTION_START_VM -> {
-                val notification =
-                    intent.getParcelableExtra<Notification>(
-                        EXTRA_NOTIFICATION,
-                        Notification::class.java,
-                    )!!
+                if (shuttingDown) {
+                    // In the process of shutting down. Do not start new VM.
+                    resultReceiver!!.send(RESULT_STOP, null) 
+                } else {
+                    val notification =
+                        intent.getParcelableExtra<Notification>(
+                            EXTRA_NOTIFICATION,
+                            Notification::class.java,
+                        )!!
 
-                val displayInfo =
-                    intent.getParcelableExtra(EXTRA_DISPLAY_INFO, DisplayInfo::class.java)!!
+                    val displayInfo =
+                        intent.getParcelableExtra(EXTRA_DISPLAY_INFO, DisplayInfo::class.java)!!
 
-                // Note: this doesn't always do the resizing. If the current image size is the same
-                // as the requested size which is rounded up to the page alignment, resizing is not
-                // done.
-                val diskSize = intent.getLongExtra(EXTRA_DISK_SIZE, image.getApparentSize())
+                    // Note: this doesn't always do the resizing. If the current image size is the same
+                    // as the requested size which is rounded up to the page alignment, resizing is not
+                    // done.
+                    val diskSize = intent.getLongExtra(EXTRA_DISK_SIZE, image.getApparentSize())
 
-                mainWorkerThread.execute({ doStart(displayInfo, diskSize, resultReceiver!!) })
+                    if (mainWorkerThreadDoingStart) {
+                        Log.i("$TAG-VmLauncherService", "onStartCommand: Already stuck starting VM. Skipping this action.")
+                        resultReceiver!!.send(RESULT_PREV_VM_RUNNING, null) // Also tell MainActivity.kt
+                    } else {
+                        mainWorkerThread.execute({ doStart(displayInfo, diskSize, resultReceiver!!) })
 
-                // Do this outside of the main worker thread, so that we don't cause
-                // ForegroundServiceDidNotStartInTimeException
-                startForeground(this.hashCode(), notification)
+                        // Do this outside of the main worker thread, so that we don't cause
+                        // ForegroundServiceDidNotStartInTimeException
+                        startForeground(this.hashCode(), notification)
+                    }
+                }
             }
             ACTION_SHUTDOWN_VM -> mainWorkerThread.execute({ doShutdown(resultReceiver) })
+            ACTION_UNPLUG_VM -> bgThreads.execute({ doShutdown(resultReceiver) }) // Just run it in the multi-thread pool...
+
             ACTION_QUERY_VM_SERIAL -> notifyIfSerialAvailable(resultReceiver)
             else -> {
                 Log.e(TAG, "Unknown command " + intent.action)
@@ -214,6 +232,8 @@ class VmLauncherService : Service() {
 
     @WorkerThread
     private fun doStart(displayInfo: DisplayInfo, diskSize: Long, resultReceiver: ResultReceiver) {
+        Log.i("$TAG-VmLauncherService", "doStart")
+        mainWorkerThreadDoingStart = true
         val image = InstalledImage.getDefault(this)
         val json = ConfigJson.from(this, image.configPath)
         val configBuilder = json.toConfigBuilder(this)
@@ -243,7 +263,10 @@ class VmLauncherService : Service() {
 
         runner =
             try {
-                Runner.create(this, config)
+                Runner.create(this, config) {
+                    Log.i(TAG, "prevVmRunningCallback()")
+                    resultReceiver.send(RESULT_PREV_VM_RUNNING, null) // this tells MainActivity.kt that previous VM is still running
+                }
             } catch (e: VirtualMachineException) {
                 // Check for denied Network permission (on GrapheneOS)
                 val serviceSpecificException = e.cause
@@ -254,7 +277,7 @@ class VmLauncherService : Service() {
                     val config = configBuilder.build()
                     // try again
                     try {
-                        Runner.create(this, config)
+                        Runner.create(this, config) {}
                     } catch (e: VirtualMachineException) {
                         throw RuntimeException("cannot create runner", e)
                     }
@@ -268,13 +291,17 @@ class VmLauncherService : Service() {
         val mbc = MemBalloonController(this, virtualMachine)
         mbc.start()
 
-        runner!!.shutdownStarted.thenAcceptAsync { resultReceiver.send(RESULT_SHUTTING_DOWN, null) }
+        runner!!.shutdownStarted.thenAcceptAsync {
+            resultReceiver.send(RESULT_SHUTTING_DOWN, null) 
+            serialSplitter?.flagForShutdown()
+            serialSplitter = null
+        }
         runner!!.exitStatus.thenAcceptAsync { success: Boolean ->
             mbc.stop()
             resultReceiver.send(if (success) RESULT_STOP else RESULT_ERROR, null)
             serialSplitter?.flagForShutdown()
             serialSplitter = null
-            stopSelf()
+            if (!mainWorkerThreadDoingStart) stopSelf() // only stop when there is no new VM start in progress
         }
         serialSplitter = Logger.setup(this, virtualMachine, bgThreads)
 
@@ -316,6 +343,7 @@ class VmLauncherService : Service() {
                 },
                 bgThreads,
             )
+        mainWorkerThreadDoingStart = false
     }
 
     private fun notifyIfSerialAvailable(resultReceiver: ResultReceiver?) {
@@ -522,6 +550,7 @@ class VmLauncherService : Service() {
 
     @WorkerThread
     private fun doShutdown(resultReceiver: ResultReceiver?) {
+        Log.i(TAG, "doShutdown()")
         runner?.run {
             // This prevents MainActivity from re-starting VmLauncherService to shut the VM down.
             shutdownStarted.complete(null)
@@ -568,6 +597,8 @@ class VmLauncherService : Service() {
     }
 
     override fun onDestroy() {
+        Log.i("$TAG-VmLauncherService", "onDestroy")
+        shuttingDown = true
         handler = null
         mainWorkerThread.execute({
             if (runner?.vm?.getStatus() == VirtualMachine.STATUS_RUNNING) {
@@ -591,6 +622,7 @@ class VmLauncherService : Service() {
         private const val EXTRA_DISK_SIZE = PREFIX + "EXTRA_DISK_SIZE"
 
         private const val ACTION_SHUTDOWN_VM: String = PREFIX + "ACTION_SHUTDOWN_VM"
+        private const val ACTION_UNPLUG_VM: String = PREFIX + "ACTION_UNPLUG_VM"
         private const val ACTION_QUERY_VM_SERIAL: String = PREFIX + "ACTION_QUERY_VM_SERIAL"
 
         private const val RESULT_START = 0
@@ -600,6 +632,7 @@ class VmLauncherService : Service() {
         private const val RESULT_SHUTTING_DOWN = 4
         private const val RESULT_SERIAL_AVAIL = 10
         private const val RESULT_TTYD_TIMEOUT = 11
+        private const val RESULT_PREV_VM_RUNNING = 12
 
         private const val KEY_TERMINAL_IPADDRESS = "address"
         private const val KEY_TERMINAL_PORT = "port"
@@ -642,6 +675,7 @@ class VmLauncherService : Service() {
                             RESULT_STOP -> callback.onVmStop()
                             RESULT_ERROR -> callback.onVmError()
                             RESULT_TTYD_TIMEOUT -> callback.onTtydTimeout()
+                            RESULT_PREV_VM_RUNNING -> callback.onPrevVmRunning()
                             else -> Log.e(TAG, "unknown result code: " + resultCode)
                         }
                     }
@@ -677,6 +711,12 @@ class VmLauncherService : Service() {
         fun getIntentForShutdown(context: Context, callback: VmLauncherServiceCallback): Intent {
             val i = prepareIntent(context, callback)
             i.setAction(ACTION_SHUTDOWN_VM)
+            return i
+        }
+        
+        fun getIntentForUnplug(context: Context, callback: VmLauncherServiceCallback): Intent {
+            val i = prepareIntent(context, callback)
+            i.setAction(ACTION_UNPLUG_VM)
             return i
         }
         

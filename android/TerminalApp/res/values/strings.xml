@@ -62,6 +62,10 @@
     <string name="vm_creation_message">Preparing terminal.\nIf the VM supports ttyd (web terminal),\nit will be displayed here.</string>
     <!-- Toast message to tip you that ttyd failed and you need the serial console [CHAR LIMIT=none] -->
     <string name="vm_creation_ttyd_timeout_message">VM booted, but ttyd (web terminal) timed out.\nYou may need to use the serial console instead.</string>
+    <!-- Snackbar message to tip you that the previous VM is still running [CHAR LIMIT=none] -->
+    <string name="vm_creation_prev_vm_running_message">Previous VM still running.</string>
+    <!-- Snackbar button for unplugging previous VM [CHAR LIMIT=none] -->
+    <string name="vm_creation_prev_vm_running_unplug_button">Unplug</string>
     <!-- Toast message to notify that terminal is stopping [CHAR LIMIT=none] -->
     <string name="vm_stop_message">Stopping terminal</string>
     <!-- Toast message to notify that terminal is crashed [CHAR LIMIT=none] -->
