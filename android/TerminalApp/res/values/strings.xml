@@ -51,6 +51,8 @@
     <string name="installer_title">Install Linux terminal</string>
     <!-- Installer activity description format [CHAR LIMIT=none] -->
     <string name="installer_desc">To launch Linux terminal, you need to download roughly <xliff:g id="expected_size" example="350GB">\u200E%1$s\u200E</xliff:g> of data over the network.\nWould you like to proceed?</string>
+    <!-- Local installer activity description format [CHAR LIMIT=none] -->
+    <string name="local_installer_desc_text_format">To launch Linux terminal, you need to install <xliff:g id="expected_size" example="350GB">\u200E%1$s\u200E</xliff:g> of data from an `images.tar.gz` file that needs to be placed in the local `linux` folder.\nWould you like to visit the install guide webpage?</string>
     <!-- Checkbox at the installer activity to download when Wi-Fi is available to prevent from paying network traffic [CHAR LIMIT=none] -->
     <string name="installer_chkbox_wifi_only">Download using Wi-Fi only</string>
     <!-- Button at the installer activity to confirm installation [CHAR LIMIT=16] -->
@@ -59,6 +61,12 @@
     <string name="installer_btn_installing">Installing</string>
     <!-- Button to cancel installation [CHAR LIMIT=20] -->
     <string name="installer_btn_cancel">Cancel installation</string>
+    <!-- Button at the installer activity to copy tutorial link to clipboard [CHAR LIMIT=16] -->
+    <string name="installer_tutorial_button_enabled_text">Open Link...</string>
+    <!-- Toast at the installer activity indicating the link is copied [CHAR LIMIT=16] -->
+    <string name="installer_link_copied_text">Link copied</string>
+    <!-- Button at the installer activity to when installation is already in progress [CHAR LIMIT=16] -->
+    <string name="installer_tutorial_button_disabled_text">Installing</string>
     <!-- Title of the confirmation dialog to cancel installation. [CHAR LIMIT=none] -->
     <string name="installer_dlg_title_cancel_install">Cancel Installation?</string>
     <!-- Message of the confirmation dialog to cancel installation. [CHAR LIMIT=none] -->
