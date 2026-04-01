@@ -482,8 +482,6 @@ object VmController {
                 } catch (e: IllegalArgumentException) {
                     // Ignore if already unregistered
                 }
-                _vmState.value =
-                    VmState.Error(RuntimeException("Timed out waiting for terminal service"))
             }
         }
     }

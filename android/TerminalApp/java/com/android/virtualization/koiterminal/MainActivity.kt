@@ -43,6 +43,7 @@ import android.view.accessibility.AccessibilityManager
 import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.RelativeLayout
+import android.widget.TextView
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.ActivityResultLauncher
@@ -54,6 +55,7 @@ import com.android.microdroid.test.common.DeviceProperties
 import com.android.virtualization.koiterminal.BetterBugLauncher.Companion.launchBetterBugActivity
 import com.android.virtualization.koiterminal.ErrorActivity.Companion.start
 import com.android.virtualization.koiterminal.VmLauncherService.VmLauncherServiceCallback
+import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import java.net.MalformedURLException
@@ -76,6 +78,7 @@ public class MainActivity :
     private lateinit var viewPager: ViewPager2
     private lateinit var tabLayout: TabLayout
     private lateinit var terminalTabAdapter: TerminalTabAdapter
+    private lateinit var prevVmRunningSnackBar: Snackbar
     private val terminalInfo = CompletableFuture<TerminalInfo>()
     private var serialOut: ParcelFileDescriptor? = null
     private var serialIn: ParcelFileDescriptor? = null
@@ -188,6 +191,13 @@ public class MainActivity :
 
         tabAddButton?.setOnClickListener { addTerminalTab() }
         tabAddSerialButton?.setOnClickListener { addTerminalTab(mode = TerminalTabAdapter.MODE_SERIAL) }
+        tabAddSerialButton?.isEnabled = false
+        prevVmRunningSnackBar = Snackbar.make(
+            findViewById<View>(R.id.terminal_container),
+            R.string.vm_creation_prev_vm_running_message,
+            Snackbar.LENGTH_INDEFINITE,
+        )
+        prevVmRunningSnackBar.anchorView = modifierKeysContainerView
     }
 
     private fun createTerminalSerialTabFragment(outReadingPfd: ParcelFileDescriptor, inWritingPfd: ParcelFileDescriptor): TerminalSerialTabFragment {
@@ -201,6 +211,7 @@ public class MainActivity :
         // Only one serial tab possible
         val tabId = when (mode) {
             TerminalTabAdapter.MODE_SERIAL -> {
+                Log.i("$TAG-addTerminalTab()", "Add serial tab with terminalTabAdapter.tabs.size = ${terminalTabAdapter.tabs.size}; criteria: ${terminalTabAdapter.hasSerial()} || $serialOut == null || $serialIn == null")
                 if (terminalTabAdapter.hasSerial() || serialOut == null || serialIn == null) return
                 terminalTabAdapter.addSerialTab(createTerminalSerialTabFragment(serialOut!!, serialIn!!))
             }
@@ -221,6 +232,13 @@ public class MainActivity :
         tabLayout.addTab(tab, true)
     }
 
+    fun clearCurrentVm() {
+        serialOut = null
+        serialIn = null
+        tabAddSerialButton?.isEnabled = false
+        prevVmRunningSnackBar.dismiss()
+    }
+
     fun closeTab(tabId: String) {
         if (!terminalTabAdapter.deleteTab(tabId)) {
             // Already closed
@@ -232,6 +250,7 @@ public class MainActivity :
 
         if (terminalTabAdapter.tabs.size == 0) {
             finish()
+            clearCurrentVm()
         }
     }
 
@@ -353,6 +372,7 @@ public class MainActivity :
     override fun onVmStart() {
         Log.i(TAG, "onVmStart()")
         isVmRunning = true
+        prevVmRunningSnackBar.dismiss()
     }
 
     override fun onTerminalAvailable(info: TerminalInfo) {
@@ -364,23 +384,27 @@ public class MainActivity :
         // TODO: pass info whether serialOut needs to be closed
         serialOut = outReadingPfd
         serialIn = inWritingPfd
+        tabAddSerialButton?.isEnabled = true
         Log.i(TAG, "onSerialAvailable(), serialOut = fd${serialOut?.getFd()}, serialIn = fd${serialIn?.getFd()}")
     }
 
     override fun onVmShuttingDown() {
         Log.i(TAG, "onVmShuttingDown()")
         isVmRunning = false
+        //clearCurrentVm()
     }
 
     override fun onVmStop() {
         Log.i(TAG, "onVmStop()")
         isVmRunning = false
         finish()
+        clearCurrentVm()
     }
 
     override fun onVmError() {
         Log.i(TAG, "onVmError()")
         isVmRunning = false
+        clearCurrentVm()
         // TODO: error cause is too simple.
         ErrorActivity.start(this, Exception("onVmError"))
     }
@@ -390,6 +414,28 @@ public class MainActivity :
         tabAddButton!!.isEnabled = true
         isTtydConnected = true
         bootCompleted.open()
+    }
+
+    override fun onPrevVmRunning() {
+        // Snack bar when previous VM has not yet shut down.
+        Log.i(TAG, "onPrevVmRunning()")
+        prevVmRunningSnackBar.setAction(
+            R.string.vm_creation_prev_vm_running_unplug_button,
+            View.OnClickListener {
+                val intent = VmLauncherService.getIntentForUnplug(this, this)
+                startService(intent)
+                clearCurrentVm()
+            }
+        )
+        prevVmRunningSnackBar.show()
+    }
+
+    override fun onTtydTimeout() {
+        Log.i(TAG, "onTtydTimeout()")
+        isVmRunning = false
+        viewPager
+            ?.findViewById<TextView>(R.id.boot_progress_text)
+            ?.text = resources.getString(R.string.vm_creation_ttyd_timeout_message)
     }
 
     override fun onAccessibilityStateChanged(enabled: Boolean) {
@@ -426,6 +472,7 @@ public class MainActivity :
     }
 
     private fun startVm() {
+        Log.i("$TAG-MainActivity", "startVm")
         val image = InstalledImage.getDefault(this)
         if (!image.isInstalled()) {
             return

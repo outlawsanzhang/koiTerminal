@@ -25,6 +25,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content">
         <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/boot_progress_text"
             android:text="@string/terminal_message_vm_creation"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
