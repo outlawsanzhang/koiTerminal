@@ -63,23 +63,13 @@
         android:layout_marginHorizontal="32dp"
         android:textSize="16sp" />
 
-    <CheckBox
-        android:id="@+id/installer_wait_for_wifi_checkbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:layout_marginHorizontal="42dp"
-        android:layout_above="@id/installer_install_button"
-        android:layout_alignParentEnd="true"
-        android:text="@string/installer_chkbox_wifi_only" />
-
     <Button
-        android:id="@+id/installer_install_button"
+        android:id="@+id/installer_tutorial_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
         android:layout_marginBottom="32dp"
         android:layout_marginHorizontal="40dp"
-        android:text="@string/installer_btn_install" />
+        android:text="@string/installer_tutorial_button_enabled_text" />
 </RelativeLayout>
