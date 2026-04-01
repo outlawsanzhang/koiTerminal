@@ -204,8 +204,16 @@ object VmController {
                     )
                 }
 
-                val port = _guestAgentController.value!!.startServer()
-                customImageConfigBuilder.addParam("debian_server_port=$port")
+                try {
+                    val port = _guestAgentController.value!!.startServer()
+                    customImageConfigBuilder.addParam("debian_server_port=$port")
+                } catch (e: RuntimeException) {
+                    // Ignore if failed due to revoked NETWORK permission on GrapheneOS
+                    Log.d(TAG, "Guest control server cannot be started: ${e.message}, ${e.cause}")
+                    if (e.message?.contains(Regex("""grpc server""")) == false) {
+                        throw e
+                    }
+                }
 
                 // Override config for Display
                 setDisplayConfig(customImageConfigBuilder)
@@ -223,18 +231,21 @@ object VmController {
                 val vmm = context.getSystemService(VirtualMachineManager::class.java)!!
                 val vmName = config.customImageConfig!!.name!!
 
-                try {
-                    vmm.get(vmName)?.let { // Clean up existing VM if it's not stopped
-                        if (it.status != VirtualMachine.STATUS_STOPPED) {
-                            Log.e(TAG, "stopping vm because it is not stopped")
-                            it.stop()
+                val deduplicate = {
+                    try {
+                        vmm.get(vmName)?.let { // Clean up existing VM if it's not stopped
+                            if (it.status != VirtualMachine.STATUS_STOPPED) {
+                                Log.e(TAG, "stopping vm because it is not stopped")
+                                it.stop()
+                            }
+                            // TODO: revisit this to see if we can omit this step.
+                            vmm.delete(vmName)
                         }
-                        // TODO: revisit this to see if we can omit this step.
-                        vmm.delete(vmName)
+                    } catch (e: VirtualMachineException) {
+                        // Ignore if VM doesn't exist
                     }
-                } catch (e: VirtualMachineException) {
-                    // Ignore if VM doesn't exist
                 }
+                deduplicate()
 
                 val callback =
                     object : VirtualMachineCallback {
@@ -308,6 +319,7 @@ object VmController {
                         configBuilder.setCustomImageConfig(customImageConfigBuilder.build())
                         val config = configBuilder.build()
                         // try again
+                        deduplicate()
                         val vm = vmm.create(vmName, config)
                         virtualMachine = vm
                         vm.setCallback(Executors.newSingleThreadExecutor(), callback)
