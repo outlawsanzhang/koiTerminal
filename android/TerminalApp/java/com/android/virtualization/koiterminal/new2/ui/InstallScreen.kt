@@ -16,6 +16,7 @@
 package com.android.virtualization.koiterminal.new2.ui
 
 import android.app.Activity
+import android.content.Intent
 import android.text.format.Formatter
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,8 +65,11 @@ import com.android.virtualization.koiterminal.R
 import com.android.virtualization.koiterminal.new2.core.InstallState
 import com.android.virtualization.koiterminal.new2.ui.main.InstallViewModel
 
+val TUTORIAL_LINK_URL = "https://github.com/outlawsanzhang/koiTerminal#how-to-use"
+
 @Composable
-fun InstallScreen(snackbarHostState: SnackbarHostState, viewModel: InstallViewModel = viewModel()) {
+fun InstallScreen(snackbarHostState: SnackbarHostState, viewModel: InstallViewModel = viewModel() ) {
+    val context = LocalContext.current
     val state by viewModel.installState.collectAsStateWithLifecycle()
     val wifiOnly by viewModel.wifiOnly.collectAsStateWithLifecycle()
     val isUpgrade by viewModel.isUpgrade.collectAsStateWithLifecycle()
@@ -101,6 +105,16 @@ fun InstallScreen(snackbarHostState: SnackbarHostState, viewModel: InstallViewMo
                 isUpgrade = isUpgrade,
                 onWifiOnlyChange = { viewModel.setWifiOnly(it) },
                 onInstall = { if (isUpgrade) viewModel.upgradeVm() else viewModel.installVm() },
+                onTutorial = {
+                    // Using Sharesheet
+                    val sendIntent: Intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, TUTORIAL_LINK_URL)
+                        type = "text/plain"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, null)
+                    context.startActivity(shareIntent)
+                },
             )
         } else if (state.isStarted()) {
             InstallScreenProgress(
@@ -148,7 +162,7 @@ private fun InstallScreenHeader(
             if (isUpgrade) {
                 stringResource(R.string.upgrade_desc_nobackup)
             } else {
-                stringResource(R.string.installer_desc, formattedSize)
+                stringResource(R.string.local_installer_desc_text_format, formattedSize)
             }
         Text(
             text = desc,
@@ -166,12 +180,26 @@ private fun InstallScreenButtons(
     isUpgrade: Boolean,
     onWifiOnlyChange: (Boolean) -> Unit,
     onInstall: () -> Unit,
+    onTutorial: () -> Unit,
 ) {
-    WifiOnlySwitch(wifiOnly = wifiOnly, onCheckedChange = onWifiOnlyChange)
-
+    if (isUpgrade) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = onInstall,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+        ) {
+            val textResId = R.string.upgrade_btn_upgrade
+            Text(text = stringResource(textResId), style = MaterialTheme.typography.labelLarge)
+        }
+    } // otherwise it automatically installs.
     Spacer(modifier = Modifier.height(16.dp))
     Button(
-        onClick = onInstall,
+        onClick = onTutorial,
         modifier = Modifier.fillMaxWidth().height(56.dp),
         colors =
             ButtonDefaults.buttonColors(
@@ -179,8 +207,7 @@ private fun InstallScreenButtons(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
     ) {
-        val textResId =
-            if (isUpgrade) R.string.upgrade_btn_upgrade else R.string.installer_btn_install
+        val textResId = R.string.installer_tutorial_button_enabled_text
         Text(text = stringResource(textResId), style = MaterialTheme.typography.labelLarge)
     }
 }
@@ -246,11 +273,6 @@ private fun InstallScreenProgress(
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(top = 4.dp),
                     )
-                }
-
-                if (!autoInstall) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    WifiOnlySwitch(wifiOnly = wifiOnly, onCheckedChange = onWifiOnlyChange)
                 }
             }
         }

@@ -69,8 +69,9 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Make an image based on Debian build script
 - [X] Make an image based on nixos-avf
 - [X] Make an image based on Secureblue
-- [ ] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
-- [ ] Stop app from messing with qcow2 disk size
+- [X] Bug fixes and polishing to celebrate initial Secureblue image
+- [X] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
+- [X] Share link instead of copy link
 - [ ] Build-time signature verification for Secureblue
 - [ ] Support for multiple `vm_config.json` files for different modes (install, update, use, airgap, etc.) or just different VMs.
     - Template - multi AppVM scheme
