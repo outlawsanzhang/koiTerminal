@@ -78,19 +78,6 @@ fun RecoveryPage(viewModel: SettingsViewModel = viewModel()) {
                 Column {
                     Text(stringResource(R.string.settings_recovery_dlg_message_reset_confirm))
                     Text(stringResource(R.string.settings_recovery_dlg_message_reset_warning))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = backupDataChecked,
-                            onCheckedChange = { backupDataChecked = it },
-                        )
-                        Text(
-                            text = stringResource(R.string.settings_recovery_dlg_option_backup),
-                            modifier = Modifier.clickable { backupDataChecked = !backupDataChecked },
-                        )
-                    }
                 }
             },
             confirmButton = {
