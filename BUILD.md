@@ -2,18 +2,20 @@
 ### Build the OS first
 The upstream app is designed to be a component of AOSP, and leverages system APIs such as `android.system.virtualmachine.VirtualMachineManager`.
 Therefore, it seems that this app cannot be built normally and has to be built with the OS build system.
-It used to be possible to build just the app with `UNBUNDLED_BUILD_SDKS_FROM_SOURCE=true TARGET_BUILD_APPS=VmTerminalApp m apps_only dist`,
-but that has not been working recently.
-If anyone knows why, or if anyone knows how to build this app normally, tips are greatly appreciated.
 
 Please follow the [GrapheneOS build guide](https://grapheneos.org/build) and build the OS for your device model.
 Use the version tag that corresponds to the tag in koiterminal.
-This needs a beefy machine with preferably 32GB of RAM and ~400GiB of storage (~150GiB to download, ~100GiB to check out, ~120GiB to compile, plus any swap file you create).
+A full OS build needs a beefy machine with preferably 32GB of RAM and ~400GiB of storage (~150GiB to download, ~100GiB to check out, ~120GiB to compile, plus any swap file you create).
 On my machine that is not very beefy, compilation from scratch takes half a day.
+
+Update: fortunately, you do not have to build the entire OS to reach koiTerminal.
+Alternatively, when the guide instructs you to build with the `m` command,
+instead run `m VmTerminalApp.com.android.virt` to build everything that leads up to the Terminal app.
+This may save about ~100GiB of storage and several hours of time compared to a full OS build.
 
 Using the instructions for `Faster builds for development use only` is fine for development as we don't need to sign the OS,
 but that will sign the apk with test keys, which everyone has.
-To use your own signature, also run `m otatools-package` to build signing tools.
+To use your own signature, also run `m otatools-package` to build signing tools. <!-- Is this needed? -->
 
 ### Tips for building
 1. For the correct version of Node.js, you can use [nvm](https://github.com/nvm-sh/nvm).
@@ -41,7 +43,7 @@ git checkout koiterminal
 cd ../../..
 ```
 
-Then, build the OS again. This should be a lot quicker than the first time.
+Then, build the Terminal app / OS again. This should be a lot quicker than the first time.
 When it completes, the app should be produced at `out/target/product/$DEVICE/apex/com.android.virt/priv-app/VmTerminalApp@*/VmTerminalApp.apk`.
 
 ### Sign the build
