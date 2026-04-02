@@ -10,17 +10,16 @@ Hats off to their very recent ARM support.
 > If Secureblue does not boot, please use the serial terminal to select the second boot option (labeled `ostree:1`),
 > which uses an older kernel. Afterwards, run `echo rpm-ostree cleanup --pending | run0` to remove the incompatible option.
 > 
-> Note that using the older kernel is a security degredation that introduces 1+ year of unpatched vulnerability.
+> Note that using the older kernel is a security degredation that introduces 1+ year (and counting) of unpatched vulnerability.
 
+1. (upstream) `ujust set-brew` [broken](https://github.com/secureblue/secureblue/issues/2098) for now
 1. Build script does not yet verify Secureblue signatures, so ghcr.io (GitHub) is currently a trusted party.
 1. Port forwarding has not been ported, but Internet should work.
 1. Automatic VM shutdown on app close has not been ported. Please shutdown within the VM after use (`run0 poweroff`).
-   When in doubt, please force stop the app in `Settings > Apps > koiTerminal` to force a shutdown.
-1. Display feature has not been ported.
+   If necessary, you can force a shutdown using the `Unplug` button in the bottom snackbar that pops up.
+1. Display does not work.
 1. The web-based terminal (ttyd) has not been ported.
 1. Features requiring kernel patches (such as dynamic memory) are not ported.
-1. Image resizing has not been disabled.
-1. The "/mnt/backup" recovery option does not work.
 
 ### Tips
 1. Please follow the [post-install recommendations](https://secureblue.dev/post-install) (displayed in the terminal on first boot as well),
@@ -29,7 +28,7 @@ Hats off to their very recent ARM support.
 1. For your convenience, the disks are split between `secureblue-system.qcow2` and `secureblue-user.qcow2`.
    It is possible to duplicate the latter and install different software on different user disks,
    potentially with some software airgapped.
-   Unfortunately, Fedora Atomic does not allow `/etc` to be a mount point and it has to be read-write,
+   Unfortunately, Fedora Atomic does not allow `/etc` to be a mount point during install and it has to be read-write during boot,
    so making `-system` read-only does not work.
    Additionally, please note that Secureblue does not claim to provide anonymity or anti-fingerprinting benefits,
    and desktop Linux is generally bad at sandboxing.
@@ -42,7 +41,7 @@ Hats off to their very recent ARM support.
 The build script is adapted from [`nixos-avf`](https://github.com/nix-community/nixos-avf), and the image is similar to the one provided there.
 ### Known issues
 1. OS update is not tested.
-1. Display probably does not work.
+1. Display does not work.
 1. This image (and `nixos-avf` as well) uses the `u-boot.bin` binary blob provided by the host OS.
    There is no guarantee that this is built from source.
    For example, GrapheneOS grabbed this directly from Google.
@@ -68,13 +67,12 @@ Currently, fixing the Alpine image is put on hold to work on other images.
 ### Known issues
 1. Network is not working.
 1. Port forwarding has not been ported.
-1. Automatic VM shutdown has not been ported. Please force stop the app in `Settings > Apps > koiTerminal` to force a shutdown.
-1. Display feature has not been ported.
+1. Automatic VM shutdown on app close has not been ported. Please shutdown within the VM after use (`poweroff`).
+   If necessary, you can force a shutdown using the `Unplug` button in the bottom snackbar that pops up.
+1. Display does not work.
 1. The web-based terminal (ttyd) has not been ported.
 1. Features requiring kernel patches (such as dynamic memory) are not ported.
 1. Custom kernel is needed, which breaks updates within the VM.
-1. Image resizing has not been disabled.
-1. The "/mnt/backup" recovery option does not work.
 
 ### VM image
 - [:dvd: image](https://drive.proton.me/urls/A7QHDFFBWM#0cgJvmQovbFN)
