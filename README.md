@@ -62,10 +62,6 @@ These goals may change, and they may or may not be achievable. We will have to s
         This advantage may be only useful for tinkereres.
 - [X] Make a new image that is not Debian
 - [X] High priority FIXME for serial console
-    - [X] Fix virtual Ctrl button
-    - [X] Implement copy/paste menus for the terminal emulator from Termux
-    - [X] Fix issue where the serial terminal cannot be closed and reopened
-    - [X] Serial tab close and open
 - [X] Make an image based on Debian build script
 - [X] Make an image based on nixos-avf
 - [X] Make an image based on Secureblue
@@ -73,15 +69,16 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
 - [X] Share link instead of copy link
 - [ ] Build-time signature verification for Secureblue
-- [ ] Support for multiple `vm_config.json` files for different modes (install, update, use, airgap, etc.) or just different VMs.
-    - Template - multi AppVM scheme
-    - Template - airgap AppVM scheme
-    - Multiple distros and backups
+- [ ]  (stretch) Build 6.12 LTS vanilla kernel RPM package for Secureblue?
+- [ ] Fix Secureblue image
+    - [ ] Add support for ttyd, shutdown, port forwarding, etc.
+- [ ]  (stretch) support some form of checkpointing to enable templates / disposable
+    - Try bundling the compiled crosvm binary when building GrapheneOS. See: https://u1f383.github.io/android/2025/06/15/run-native-binary-on-android.html
+    - Try passing file descriptors to avoid permission issues
+- [ ] Implement a super-config system, including support for multiple `vm_config.json` files for different modes (install, update, use, isolated software, airgap...) or just different VMs.
 - [ ] FIXME for serial console
-    - [ ] Alt + Backspace etc.
     - [ ] Make pty changes work
     - [ ] Make mouse work in serial terminal
-    - [ ] Deleting folder does not work in the DocumentProvider
     - [ ] Find out which kernel versions and what configurations work. How about 6.6 LTS?
     - [ ] "VM already exists" bug
 - [ ]  (stretch) Enable forcing the VM to use the host vpn
