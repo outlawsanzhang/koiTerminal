@@ -179,8 +179,6 @@ class TerminalSerialTabFragment() : Fragment() {
             val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             if (activity.resources.configuration.keyboard != Configuration.KEYBOARD_QWERTY) {
                 imm.showSoftInput(terminalView, InputMethodManager.SHOW_IMPLICIT)
-            } else {
-                imm.hideSoftInputFromWindow(terminalView.getWindowToken(), 0)
             }
             activity.modifierKeysController.update()
         }
