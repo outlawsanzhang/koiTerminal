@@ -71,17 +71,15 @@ public class InstallerActivity : BaseActivity() {
         tutorialButton = findViewById<TextView>(R.id.installer_tutorial_button)
 
         tutorialButton.setOnClickListener(View.OnClickListener {
-            // copy link to clipboard
-            (getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager)?.let { clipboard ->
-                val clip = ClipData.newPlainText("Tutorial webpage URL", TUTORIAL_LINK_URL)
-                clipboard.setPrimaryClip(clip)
+            // Using Sharesheet
+            val sendIntent: Intent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, TUTORIAL_LINK_URL)
+                type = "text/plain"
             }
-            R.string.installer_link_copied_text
-            Toast.makeText(
-                this,
-                R.string.installer_link_copied_text,
-                Toast.LENGTH_SHORT,
-            ).show()
+
+            val shareIntent = Intent.createChooser(sendIntent, null)
+            startActivity(shareIntent)
         })
 
         val intent = Intent(this, InstallerService::class.java)

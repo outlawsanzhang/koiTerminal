@@ -67,6 +67,7 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Make an image based on Secureblue
 - [X] Bug fixes and polishing to celebrate initial Secureblue image
 - [X] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
+- [X] Share link instead of copy link
 - [ ] Build-time signature verification for Secureblue
 - [ ]  (stretch) Build 6.12 LTS vanilla kernel RPM package for Secureblue?
 - [ ] Fix Secureblue image
