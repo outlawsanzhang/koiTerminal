@@ -45,7 +45,7 @@ The build script is adapted from [`nixos-avf`](https://github.com/nix-community/
 1. This image (and `nixos-avf` as well) uses the `u-boot.bin` binary blob provided by the host OS.
    There is no guarantee that this is built from source.
    For example, GrapheneOS grabbed this directly from Google.
-    - See source code: [[https://github.com/GrapheneOS/platform_manifest/blob/2026012800/default.xml#L22][device/google/cuttlefish_prebuilts]]/[[https://android.googlesource.com/device/google/cuttlefish_prebuilts/+/refs/tags/android-16.0.0_r4/bootloader/crosvm_aarch64/][bootloader/crosvm_aarch64/u-boot.bin]]
+    - See source code: [https://github.com/GrapheneOS/platform_manifest/blob/2026012800/default.xml#L22](device/google/cuttlefish_prebuilts)/[https://android.googlesource.com/device/google/cuttlefish_prebuilts/+/refs/tags/android-16.0.0_r4/bootloader/crosvm_aarch64/](bootloader/crosvm_aarch64/u-boot.bin)
 1. The upstream build script uses the GPL 3.0 license. The adapted script cannot be provided here, and is forked to a [separate repository](https://github.com/outlawsanzhang/nixos-avf-koiTerminal?tab=readme-ov-file).
 
 ### VM image
