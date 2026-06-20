@@ -55,7 +55,8 @@ class InstallViewModel : ViewModel() {
 
     /** Whether the installation should proceed automatically (e.g., from a local image). */
     val autoInstall: Boolean
-        get() = ImageArchive.isLocalImage()
+        get() = ImageArchive.isLocalImage() && 
+        installState.value.let { !(it is InstallState.NeedsUpgrade || it is InstallState.Checking) }
 
     init {
         autoInstallIfNecessary()
