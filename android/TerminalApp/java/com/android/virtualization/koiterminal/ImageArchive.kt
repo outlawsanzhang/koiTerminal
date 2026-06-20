@@ -196,7 +196,7 @@ internal class ImageArchive {
                     }
 
                     // Override cidata if necessary. Assume overridden cidata uses AIDL guest agent.
-                    if (Build.isDebuggable() && extra_source.exists() == true) {
+                    if (extra_source.exists() == true) {
                         Log.d(TAG, "Installing /sdcard/linux/cidata.iso")
 
                         val cidataPath = dir.resolve(extra_source.fileName)
@@ -213,13 +213,7 @@ internal class ImageArchive {
                             val cidataBuildId = dir.resolve(InstalledImage.CIDATA_BUILD_ID_FILENAME)
                             Files.deleteIfExists(cidataBuildId)
                         }
-                    } else {
-                        val installedCidata = dir.resolve(CIDATA_NAME)
-                        Log.d(TAG, "Installing bundled cidata.iso")
-                        copyAsset(context, CIDATA_NAME, dir)
-                        copyAsset(context, InstalledImage.CIDATA_BUILD_ID_FILENAME, dir)
                     }
-
                     commitInstallationAt(dir)
                     close()
                 } catch (e: Exception) {

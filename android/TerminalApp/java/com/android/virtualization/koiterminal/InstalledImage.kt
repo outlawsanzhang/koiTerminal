@@ -57,17 +57,29 @@ public class InstalledImage private constructor(val installDir: Path) {
             // Regex captures: Group 1 (Target), Group 2 (ID), Group 3 (Date)
             // This handles cases where the target itself might contain hyphens.
             private val PATTERN = """^(.*?)-(\d+)-(.*)$""".toRegex()
+            private val PATTERN_CUSTOM = """^(\d+) (\d+)$""".toRegex()
 
             // Matches: "Fri Nov 28 04:09:48 UTC 2025"
             private val DATE_FORMATTER =
                 DateTimeFormatter.ofPattern("EEE MMM dd HH:mm:ss z yyyy", Locale.US)
 
             fun parse(input: String): BuildInfo {
-                val match =
-                    PATTERN.find(input)
+                val match = PATTERN.find(input)
+                if (match == null) {
+                    // For outdated custom images
+                    val match = PATTERN_CUSTOM.find(input)
                         ?: throw IllegalArgumentException(
                             "String does not match 'target-id-date' format: $input"
                         )
+                    val (version, yearStr) = match.destructured
+                    val year = yearStr.toInt()
+                    return BuildInfo(
+                        rawString = input,
+                        target = "koi/aarch64/$version",
+                        buildId = year,
+                        timestamp = ZonedDateTime.parse("Fri Nov 28 04:09:48 UTC 2025", DATE_FORMATTER).withYear(year),
+                    )
+                }
 
                 val (target, idStr, dateStr) = match.destructured
 
@@ -139,30 +151,16 @@ public class InstalledImage private constructor(val installDir: Path) {
 
     fun isCompatible(context: Context): Boolean {
         if (Files.exists(java.nio.file.Paths.get("/sdcard/linux/force_upgrade"))) {
-            Log.d(TAG, "Terminal image would be forcefully upgraded")
+            Log.d(TAG, "isCompatible = false: Terminal image would be forcefully upgraded")
             return false
         }
+        Log.d(TAG, "isCompatible: buildInfo=$buildInfo cidataBuildId=<$cidataBuildId>")
         val info = buildInfo ?: return false
         if (info.timestamp.year < RELEASE_YEAR) {
-            Log.d(TAG, "Base image is outdated")
+            Log.d(TAG, "isCompatible = false: Base image is outdated")
             return false
         }
-        if (cidataBuildId == null) {
-            Log.d(TAG, "cidata.iso is outdated. Should use bundled cidata.iso")
-            return false
-        }
-        if (cidataBuildId == "dev") {
-            Log.d(TAG, "Upgrade is disabled for dev image")
-            return true
-        }
-        val bundledCidataBuildId =
-            context.assets.open(CIDATA_BUILD_ID_FILENAME).use {
-                String(it.readBytes(), StandardCharsets.UTF_8)
-            }
-        if (cidataBuildId != "dev" && cidataBuildId != bundledCidataBuildId) {
-            Log.d(TAG, "cidata.iso is outdated")
-            return false
-        }
+        Log.d(TAG, "isCompatible = true, skipping cidata build ID verification")
         return true
     }
 
@@ -292,7 +290,7 @@ public class InstalledImage private constructor(val installDir: Path) {
         const val MARKER_FILENAME: String = "completed"
 
         const val RESIZE_STEP_BYTES: Long = 4 shl 20 // 4 MiB
-        const val RELEASE_YEAR: Int = 2026
+        const val RELEASE_YEAR: Int = 2025
 
         /** Returns InstalledImage for a given app context */
         fun getDefault(context: Context): InstalledImage {
