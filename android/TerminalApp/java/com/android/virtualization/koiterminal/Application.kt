@@ -26,7 +26,7 @@ import com.android.virtualization.koiterminal.new2.core.VmController
 public class Application : AndroidApplication() {
     override fun onCreate() {
         super.onCreate()
-        if (Flags.terminalNewuiJetpack()) {
+        if (LauncherActivity.terminalNewuiJetpack(this)) {
             Installer.initialize(this)
             VmController.initialize(this)
         }
