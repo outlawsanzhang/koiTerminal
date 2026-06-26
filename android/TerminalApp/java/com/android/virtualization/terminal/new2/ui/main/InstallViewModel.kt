@@ -129,9 +129,8 @@ class InstallViewModel : ViewModel() {
             ActionType.Retry -> {
                 retryCheck()
             }
-            ActionType.ReportBug -> {
-                val exception = event.cause as? Exception ?: Exception(event.cause)
-                BetterBugLauncher.launchBetterBugActivity(activity, exception)
+            ActionType.ShowBug -> {
+                Installer.setShowIfError(true)
             }
         }
     }
@@ -175,8 +174,8 @@ class InstallViewModel : ViewModel() {
             InstallState.ErrorCause.DeleteBackupFailed ->
                 InstallUiEvent.ShowSnackbar(
                     R.string.error_title,
-                    R.string.error_btn_report_bug,
-                    ActionType.ReportBug,
+                    R.string.error_btn_show_error,
+                    ActionType.ShowBug,
                     state.cause,
                 )
         }
@@ -198,6 +197,6 @@ class InstallViewModel : ViewModel() {
         OpenWifiSettings,
         OpenStorageSettings,
         Retry,
-        ReportBug,
+        ShowBug,
     }
 }

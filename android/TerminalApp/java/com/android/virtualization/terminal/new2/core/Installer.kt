@@ -97,6 +97,9 @@ object Installer {
         )
     val installState: StateFlow<InstallState> = _installState.asStateFlow()
 
+    private val _showIfError = MutableStateFlow(false)
+    val showIfError = _showIfError.asStateFlow()
+
     private val _wifiOnly = MutableStateFlow(true)
     val wifiOnly = _wifiOnly.asStateFlow()
 
@@ -222,6 +225,10 @@ object Installer {
     fun setWifiOnly(enabled: Boolean) {
         _wifiOnly.value = enabled
         synchronized(this) { (this as Object).notifyAll() }
+    }
+
+    fun setShowIfError(enabled: Boolean) {
+        _showIfError.value = enabled
     }
 
     private suspend fun downloadAndInstall(

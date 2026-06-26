@@ -400,6 +400,8 @@
     <string name="error_text_code">Error code: <xliff:g id="error_code" example="ACCESS_DENIED">%s</xliff:g></string>
     <!-- Button at the error activity for bugreport [CHAR LIMIT=16] -->
     <string name="error_btn_report_bug">Report bug</string>
+    <!-- Button at the error screen for showing [CHAR LIMIT=16] -->
+    <string name="error_btn_show_error">Show</string>
 
 
     <!-- ================================================================= -->

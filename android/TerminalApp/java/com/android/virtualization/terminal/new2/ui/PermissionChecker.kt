@@ -78,7 +78,7 @@ fun PermissionChecker(viewModel: MainViewModel, snackbarHostState: SnackbarHostS
         if (missing.isNotEmpty()) {
             val deniedLabels = missing.map { getPermissionLabel(it) }.joinToString(", ")
             scope.launch {
-                snackbarHostState.currentSnackbarData?.dismiss()
+                // snackbarHostState.currentSnackbarData?.dismiss()
                 val result =
                     snackbarHostState.showSnackbar(
                         message =
