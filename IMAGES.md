@@ -53,7 +53,14 @@ The build script is adapted from [`nixos-avf`](https://github.com/nix-community/
 - [:hammer_and_wrench: building guide](https://github.com/outlawsanzhang/nixos-avf-koiTerminal?tab=readme-ov-file#building-initial-image-optional-for-development)
 
 # Debian
-The image is now built from Google's scripts. (Modifying an image downloaded from Google is deprecated)
+The image is now built from Google's old scripts from Android 16.
+
+The Android 17 script skips building the kernel and downloads it from Google instead.
+It does have some new features though, like the ttyd that works even with `Block connections without VPN` option on.
+It will have to be reworked before koiTerminal can use it.
+
+Modifying an image downloaded from Google is deprecated.
+
 ### Known issues
 1. On the first boot, the serial terminal takes a while until it allows logging in, about one minute after the web-based terminal is ready.
 1. Kernel logs can appear on the serial console and make a mess. This mostly happens during the first minute after log in.

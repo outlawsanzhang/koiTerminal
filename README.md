@@ -29,10 +29,11 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - Provides images for other distros (Secureblue, NixOS, Alpine)
 - Exposes VM files (configs, storage, etc.) to enable modifying VM configurations
 - Does not force you to give the VM access to all files
+- Supports airgapping the VM (deny Network permission) in GrapheneOS
 - No rooting necessary, requiring only a one-time permission grant using ADB.
 - Can connect to the VM using the serial console, which enables:
     - Booting from (almost) fresh OS installs
-    - Supporting using the `Block connections without VPN` setting
+    - Supporting using the `Block connections without VPN` setting, or denying Network
     - Changing font size :)
     - Booting from installation media using u-boot (instructions to come) <!-- UPDATE -->
 
@@ -46,7 +47,6 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - Known sharp edges: <!-- UPDATE -->
     - Just crashes when files referenced in `vm_config.json` are not found, without indicating which.
     - Some images have issues, such as Alpine having network issues, and Secureblue not shutting down properly. See [IMAGES.md](IMAGES.md) for details.
-    - Console output (kernel messages, serial console IO) is still logged in a file. This needs to be opt-in.
 
 ## Progress and plans
 Goals are mainly targeted at things that neither Google nor GrapheneOS is inclined to do in the near future.
@@ -60,29 +60,31 @@ These goals may change, and they may or may not be achievable. We will have to s
     - ~~Allows a "raw" image to run~~
       - It does not seem that many distros can run well out-of-the-box due to kernel issues, implying that special images need to be built anyway.
         This advantage may be only useful for tinkereres.
-- [X] Make a new image that is not Debian
-- [X] High priority FIXME for serial console
+- [X] Make an image based on Alpine
 - [X] Make an image based on Debian build script
 - [X] Make an image based on nixos-avf
 - [X] Make an image based on Secureblue
 - [X] Bug fixes and polishing to celebrate initial Secureblue image
 - [X] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
-- [X] Share link instead of copy link
+- [X] Port to Android 17 version of VmTerminalApp
 - [ ] Build-time signature verification for Secureblue
-- [ ]  (stretch) Build 6.12 LTS vanilla kernel RPM package for Secureblue?
 - [ ] Fix Secureblue image
+    - [ ] Add support for display.
     - [ ] Add support for ttyd, shutdown, port forwarding, etc.
+    - [ ] Add support for file transfer.
+- [ ]  (stretch) Build 6.12 LTS vanilla kernel RPM package for Secureblue?
+- [ ] Implement a super-config system, including support for multiple `vm_config.json` files for different modes (install, update, use, isolated software, airgap...) or just different VMs.
+    - put settings for `console_in`, `default_console` (ttyd/serial), `disposable`, `vm_config_path`, etc. there.
+- [ ] Write a install guide inside the app
+
 - [ ]  (stretch) support some form of checkpointing to enable templates / disposable
     - Try bundling the compiled crosvm binary when building GrapheneOS. See: https://u1f383.github.io/android/2025/06/15/run-native-binary-on-android.html
     - Try passing file descriptors to avoid permission issues
-- [ ] Implement a super-config system, including support for multiple `vm_config.json` files for different modes (install, update, use, isolated software, airgap...) or just different VMs.
 - [ ] FIXME for serial console
     - [ ] Make pty changes work
     - [ ] Make mouse work in serial terminal
     - [ ] Find out which kernel versions and what configurations work. How about 6.6 LTS?
-    - [ ] "VM already exists" bug
 - [ ]  (stretch) Enable forcing the VM to use the host vpn
-- [ ] Enable trying to keep the VM alive in the background
 - [ ] Write a install guide inside the app
 - [ ] Support `images.zip` in addition to `images.tar.gz`
 - [X]  (stretch) Compile u-boot
@@ -92,11 +94,12 @@ These goals may change, and they may or may not be achievable. We will have to s
     - Something to replace dynamic VM storage resizing
     - Make the display work
     - Make the mouse work (offset issue)
+- [ ] Support holding modifier keys (in ttyd too)
+- [ ]  (stretch) Enable forcing the VM to use the host vpn
 
 Suggested by community:
 - Only applies to ttyd:
     - [ ] Changing font size (MainActivity.kt#L251)
-    - [ ] Fix backspace bug, I mean wtf.
 
 Suggested by community, but either may not be easily done or Google is better suited to do it:
 - [ ] USB support
@@ -121,19 +124,14 @@ adb shell pm grant --user ?? com.android.virtualization.koiterminal android.perm
 
 Special setup using GrapheneOS-specific permissions:
 - You can use Storage Scopes and grant the `linux` folder (see below for location) instead of full storage access. <!-- UPDATE -->
-- You can either keep the Network permission on, or follow these to airgap the VM and the app: <!-- UPDATE -->
-    1. Deny the Network permission to koiTerminal.
-    2. Follow the rest of this guide, but make sure to avoid VM images that do not support the serial console and rely on the network-based terminal emulator.
-    3. Wait for the app to crash after installing the VM image, with an exception that complains about missing Network permission.
-    4. Go to the exposed internal files, and change `"network": true,` to `"network": false,` in `linux/vm_config.json`.
-    5. Relaunch the app.
+- You can either keep the Network permission on, or turn it off to airgap the VM and the app. koiTerminal will automatically remove network for the VM. <!-- UPDATE -->
 
 ### Obtain a VM image
 Google's official image will not work as its setup requires extra permissions to enable virtiofs (seamless folder sharing between host and VM).
 
 This project provides the following images (and image building guides for those wishing to customize further): <!-- UPDATE -->
 - SecureBlue
-- Debian built from Google's scripts
+- Debian built from Google's scripts (the old script from Android 16)
 - NixOS adapted from [nixos-avf](https://github.com/nix-community/nixos-avf)
 - (Buggy for now) Alpine
 - (Deprecated) Modified Debian from Google
@@ -169,18 +167,23 @@ user root
 The app should automatically install the image.
 After the install, it should be able to show the terminal in at least one of two ways:
 
-(1) If the image supports ttyd (right now the NixOS and Debian images), then the terminal should just appear. <!-- UPDATE -->
-If you are using a VPN, it may block the local connection used to communicate with the VM.
-Make sure to turn off `Block connections without VPN` in the system settings, and enable your VPN's local network access if it also blocks local connections.
+(1) If the image supports the serial console, it will appear when the VM boots. 
+Right now, all images should support this method. <!-- UPDATE -->
 
-(2) If the image supports the serial console, you can press the add serial console tab button (plus sign with a tail <img src="https://i.kym-cdn.com/entries/icons/square/000/010/566/060.png" style="height: 2em"> <!-- UPDATE -->) to connect to the VM's console.
-Right now, all images should support this method, although for the Debian images, kernel logs may occasionally appear on your console and make a mess. <!-- UPDATE -->
-This method works with the `Block connections without VPN` option and connects directly to the VM.
+This method works with the `Block connections without VPN` option since it connects directly to the VM.
 Note the VM is still outside the VPN, connected straight to the Internet. <!-- UPDATE -->
+This method also works if the app's Network permission is denied in GrapheneOS.
+In this case, the VM will not have Internet access and will be airgapped.
 This console uses code from Termux, and inherits some of its features like zooming.
-However, each VM can have only one serial console tab, unlike the multi-tab ttyd.
+If you close the serial console tab (and the VM stays alive because you still have ttyd tabs),
+you can press the add serial console tab button (plus sign with a tail <img src="https://i.kym-cdn.com/entries/icons/square/000/010/566/060.png" style="height: 2em"> <!-- UPDATE -->) to reconnect.
 
-Just like the official Linux Terminal app, if it throws an error, or if it is stuck, try force-stopping and restarting the app, or use the recovery button to wipe and start over.
+However, each VM can have only one serial console tab, unlike the multi-tab ttyd.
+For the Debian images, kernel logs may occasionally appear on your console and make a mess.
+
+(2) If the image supports ttyd (right now the NixOS and Debian images), then you can add ttyd tabs by pressing the "+" sign. <!-- UPDATE -->
+However, if you are using a VPN, it may block the local connection used to communicate with the VM.
+Make sure to turn off `Block connections without VPN` in the system settings, and enable your VPN's local network access if it also blocks local connections.
 
 # How to build koiTerminal
 Please see [BUILD.md](BUILD.md).
