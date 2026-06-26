@@ -1,3 +1,7 @@
+> [!NOTE]
+> The current Debian build script is not tested.
+> Please checkout the last commit under Android 16 (which is 2026032000) and use the build script there.
+
 # Prepare the modified Debian image
 There are two ways of obtaining the Debian image: building it yourself, or modifying a downloaded Google image (deprecated).
 The Debian image provided in this repo is built from scratch since 2026021200.

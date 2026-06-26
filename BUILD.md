@@ -5,10 +5,12 @@ Therefore, it seems that this app cannot be built normally and has to be built w
 
 Please follow the [GrapheneOS build guide](https://grapheneos.org/build) and build the OS for your device model.
 Use the version tag that corresponds to the tag in koiterminal.
-A full OS build needs a beefy machine with preferably 32GB of RAM and ~400GiB of storage (~150GiB to download, ~100GiB to check out, ~120GiB to compile, plus any swap file you create).
+
+You do not have to build the entire OS to reach koiTerminal.
+If you do a full OS build, you need a beefy machine with preferably 32GB of RAM and ~400GiB of storage
+(~150GiB to download, ~100GiB to check out, ~120GiB to compile, plus any swap file you create).
 On my machine that is not very beefy, compilation from scratch takes half a day.
 
-Update: fortunately, you do not have to build the entire OS to reach koiTerminal.
 Alternatively, when the guide instructs you to build with the `m` command,
 instead run `m VmTerminalApp.com.android.virt` to build everything that leads up to the Terminal app.
 This may save about ~100GiB of storage and several hours of time compared to a full OS build.
@@ -30,6 +32,7 @@ To use your own signature, also run `m otatools-package` to build signing tools.
     Add `torsocks_bin=/usr/bin/torsocks` to the `git` line in `vendor/google_devices/$DEVICE/adevtool-version-check.mk`
     To figure out what the issue is, you will ned to run the wrapped command yourself to show all of stdout.
 3. For the spike of memory usage, you can use a swap file: `# swapon ~/swap.tmp`
+4. If you get 403, 404, 429, 503, etc. HTTP responses, switch routes, then retry, retry, and retry again.
 
 ### Build koiTerminal
 Please finish building the whole OS before following the rest of this guide.
@@ -65,6 +68,6 @@ rm -rf $RELEASE_OUT
 mkdir -p $RELEASE_OUT
 
 cp out/target/product/$DEVICE/apex/com.android.virt/priv-app/VmTerminalApp@*/VmTerminalApp.apk $RELEASE_OUT/VmTerminalApp.apk
-apksigner sign --ks keys/$DEVICE/vm-app-signing.jks $RELEASE_OUT/VmTerminalApp.apk
+out_adevtool_deps/host/linux-x86/bin/apksigner sign --ks keys/$DEVICE/vm-app-signing.jks $RELEASE_OUT/VmTerminalApp.apk
 ```
 
