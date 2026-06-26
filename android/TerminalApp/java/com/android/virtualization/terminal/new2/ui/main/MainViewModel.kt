@@ -55,7 +55,7 @@ sealed interface MainUiState {
     data object Stopping : MainUiState
 
     sealed interface ErrorHandler {
-        data class ReportBug(val error: Throwable) : ErrorHandler
+        data class ShowBug(val error: Throwable) : ErrorHandler
     }
 
     data class Error(val handler: ErrorHandler) : MainUiState
@@ -107,6 +107,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showSettings = MutableStateFlow(false)
     val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
 
+    private val _showIfError = MutableStateFlow(false)
+    val showIfError: StateFlow<Boolean> = _showIfError.asStateFlow()
+
     private val _hasMandatoryPermissions = MutableStateFlow(false)
     val hasMandatoryPermissions: StateFlow<Boolean> = _hasMandatoryPermissions.asStateFlow()
 
@@ -140,6 +143,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSettingsRequest() {
         _settingsRequest.value = null
+    }
+
+    fun setShowIfError(enabled: Boolean) {
+        _showIfError.value = enabled
     }
 
     fun toggleDisplay() {
@@ -211,7 +218,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     is VmState.Error -> {
                         setIsImeVisible(false)
-                        MainUiState.Error(MainUiState.ErrorHandler.ReportBug(vmState.cause))
+                        MainUiState.Error(MainUiState.ErrorHandler.ShowBug(vmState.cause))
                     }
                 }
             }
@@ -326,6 +333,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             } else {
                                 // If installation is removed or checking, reset flags and UI.
+                                // FIXME: when VM is deleted in the background, this gets stuck
                                 hasVmEverStarted = false
                                 _showSettings.value = false
                             }

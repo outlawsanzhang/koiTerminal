@@ -25,11 +25,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +48,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +59,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.virtualization.terminal.BetterBugLauncher
@@ -64,6 +76,8 @@ fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val installState by Installer.installState.collectAsStateWithLifecycle()
     val showSettings by viewModel.showSettings.collectAsStateWithLifecycle()
+    val showIfInstallerError by Installer.showIfError.collectAsStateWithLifecycle()
+    val showIfError by viewModel.showIfError.collectAsStateWithLifecycle()
     val isFullscreen by viewModel.isFullscreen.collectAsStateWithLifecycle()
     val hasMandatoryPermissions by viewModel.hasMandatoryPermissions.collectAsStateWithLifecycle()
 
@@ -85,7 +99,9 @@ fun MainScreen(viewModel: MainViewModel) {
             }
             is MainUiState.Stopped -> activity.finish()
             is MainUiState.Error -> {
-                handleError(activity, snackbarHostState, state.handler)
+                handleError(activity, snackbarHostState, state.handler) {
+                    viewModel.setShowIfError(true)
+                }
             }
             else -> {}
         }
@@ -96,10 +112,27 @@ fun MainScreen(viewModel: MainViewModel) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+                val installStateNow = installState
+                val uiStateNow = uiState
                 if (!hasMandatoryPermissions) {
                     PermissionScreen(viewModel = viewModel)
                 } else if (installState !is InstallState.Installed) {
                     InstallScreen(snackbarHostState = snackbarHostState)
+                } else if (installStateNow is InstallState.Error && showIfInstallerError) {
+                    ErrorScreen(
+                        error = installStateNow.cause,
+                        onDismiss = { Installer.setShowIfError(false) },
+                        onReset = { Installer.initialize(context) },
+                    )
+                } else if (uiStateNow is MainUiState.Error && showIfError) {
+                    ErrorScreen(
+                        error = (uiStateNow.handler as MainUiState.ErrorHandler.ShowBug).error,
+                        onDismiss = { viewModel.setShowIfError(false) },
+                        onReset = {
+                            Installer.initialize(context)
+                            viewModel.restartVm()
+                        },
+                    )
                 } else
                     when (val state = lastValidState) {
                         is MainUiState.Ready -> {
@@ -192,21 +225,24 @@ private suspend fun handleError(
     activity: Activity,
     snackbarHostState: SnackbarHostState,
     handler: MainUiState.ErrorHandler,
+    onShowBug: () -> Unit,
 ) {
     val (messageId, actionLabel, action) =
         when (handler) {
-            is MainUiState.ErrorHandler.ReportBug ->
+            is MainUiState.ErrorHandler.ShowBug ->
                 Triple(
                     R.string.error_title,
-                    activity.getString(R.string.error_btn_report_bug),
+                    activity.getString(R.string.error_btn_show_error),
                     {
                         val error = handler.error
                         val exception = error as? Exception ?: Exception(error)
-                        BetterBugLauncher.launchBetterBugActivity(activity, exception)
+                        // BetterBugLauncher.launchBetterBugActivity(activity, exception) // don't report it to Google
+                        onShowBug()
                     },
                 )
         }
 
+    snackbarHostState.currentSnackbarData?.dismiss()
     val result =
         snackbarHostState.showSnackbar(
             message = activity.getString(messageId),
@@ -215,5 +251,62 @@ private suspend fun handleError(
         )
     if (result == SnackbarResult.ActionPerformed) {
         action()
+    }
+}
+
+@Composable
+fun ErrorScreen(error: Throwable, onDismiss: () -> Unit, onReset: () -> Unit) {
+    val error = error as? Exception ?: Exception(error)
+    Column(
+        modifier =
+            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.error_title),
+            style = MaterialTheme.typography.headlineLarge,
+            textAlign = TextAlign.Left,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        Box(modifier = Modifier.fillMaxWidth().weight(4f)) {
+            Text(
+                text = Log.getStackTraceString(error),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.matchParentSize().verticalScroll(rememberScrollState()),
+            )
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+        val colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        )
+        Row(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            Spacer(modifier = Modifier.width(32.dp))
+            Button(
+                onClick = {
+                    onDismiss()
+                    onReset()
+                },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                colors = colors,
+            ) {
+                val textResId = R.string.settings_graphics_dlg_btn_restart
+                Text(text = stringResource(textResId), style = MaterialTheme.typography.labelLarge)
+            }
+            Spacer(modifier = Modifier.width(32.dp))
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                colors = colors,
+            ) {
+                val textResId = R.string.settings_graphics_dlg_btn_later
+                Text(text = stringResource(textResId), style = MaterialTheme.typography.labelLarge)
+            }
+            Spacer(modifier = Modifier.width(32.dp))
+        }
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
