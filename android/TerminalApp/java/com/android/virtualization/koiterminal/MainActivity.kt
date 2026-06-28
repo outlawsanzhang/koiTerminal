@@ -24,7 +24,6 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.graphics.fonts.FontStyle
-import android.media.MediaScannerConnection
 import android.widget.TextView
 import android.net.Uri
 import android.os.Build
@@ -278,12 +277,7 @@ public class MainActivity :
 
     override fun onPause() {
         super.onPause()
-        MediaScannerConnection.scanFile(
-            this,
-            arrayOf("/storage/emulated/${userId}/Download"),
-            null /* mimeTypes */,
-            null, /* callback */
-        )
+        // MediaScannerConnection not needed as VM has no access there
     }
 
     override fun onStart() {

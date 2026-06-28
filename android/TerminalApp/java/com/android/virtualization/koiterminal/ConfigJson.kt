@@ -37,6 +37,7 @@ import java.io.FileReader
 import java.io.IOException
 import java.io.Reader
 import java.lang.Exception
+import java.lang.NoSuchMethodError
 import java.lang.RuntimeException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -182,6 +183,8 @@ internal data class ConfigJson(
                 return null
             } catch (e: IOException) {
                 return null
+            } catch (e: NoSuchMethodError) {
+                return null
             }
         }
 
@@ -324,7 +327,6 @@ internal data class ConfigJson(
             val rules: Map<String, String> =
                 mapOf(
                     "\\\$PAYLOAD_DIR" to InstalledImage.getDefault(context).installDir.toString(),
-                    "\\\$USER_ID" to context.userId.toString(),
                     "\\\$PACKAGE_NAME" to context.getPackageName(),
                     "\\\$APP_DATA_DIR" to context.getDataDir().toString(),
                 )
