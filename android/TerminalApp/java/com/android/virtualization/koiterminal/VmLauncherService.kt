@@ -58,6 +58,7 @@ import io.grpc.okhttp.OkHttpServerBuilder
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.lang.NoSuchMethodError
 import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.nio.file.Files
@@ -413,7 +414,7 @@ class VmLauncherService : Service() {
                 stopIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-        val icon = Icon.createWithResource(resources, R.drawable.ic_launcher_foreground)
+        val icon = Icon.createWithResource(this, R.drawable.ic_launcher_foreground)
         val stopActionText: String? =
             resources.getString(R.string.service_notification_force_quit_action)
         val stopNotificationTitle: String? =
@@ -422,7 +423,7 @@ class VmLauncherService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(stopNotificationTitle)
             .setOngoing(true)
-            .setSilent(true)
+            .apply { try { setSilent(true) } catch (e: NoSuchMethodError) {} }
             .addAction(Notification.Action.Builder(icon, stopActionText, stopPendingIntent).build())
             .build()
     }

@@ -36,6 +36,7 @@ import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import java.io.IOException
 import java.io.InputStream
 import java.lang.Exception
+import java.lang.NoSuchMethodError
 import java.lang.RuntimeException
 import java.lang.ref.WeakReference
 import java.net.SocketException
@@ -72,7 +73,7 @@ class InstallerService : Service() {
             )
         notification =
             Notification.Builder(this, Application.CHANNEL_LONG_RUNNING_ID)
-                .setSilent(true)
+                .apply { try { setSilent(true) } catch (e: NoSuchMethodError) {} }
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(getString(R.string.installer_notif_title_text))
                 .setContentText(getString(R.string.installer_notif_desc_text))

@@ -38,9 +38,10 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 
 ## Disclaimers
 - Proof-of-concept pre-alpha test-build software, provided AS-IS. Beware of sharp edges, and back up often. You have been warned.
-- The app is only tested on newer devices running the latest GrapheneOS, so it would be nice to know if it works for other OSes at all.
+- The app is only tested on newer devices running the latest GrapheneOS (and One UI 8.5 at one point), so it would be nice to know if it works for other OSes.
   Many Android-based OSes and devices do not support Android Virtualization Framework, and may not be based on the latest version of AOSP.
-  In addition, 6th-generation Pixels require root to use AVF, so they are not supported.
+  The support may feel arbitrary. For example, it appears that Samsung's Galaxy Tab S10 FE supports AVF, but S10 Lite probably does not.
+  In addition, 6th-generation Pixels previously required root to use AVF, and it would be nice to know if that is still the case.
   This project does not aim to continuously support lower OS versions.
 - There is a decent chance that this will be abandonware, especially if a major part of this is upstreamed to GrapheneOS. Again, AS-IS.
 - Known sharp edges: <!-- UPDATE -->
@@ -119,7 +120,14 @@ adb shell pm grant --user ?? com.android.virtualization.koiterminal android.perm
 # Don't forget to turn off wireless debugging afterwards.
 ```
 
-Special setup using GrapheneOS-specific permissions:
+For One UI, it seems one additional permission to call internal API is required.
+Note that this grants ALL apps the permission to do so, which mignt be detrimental to security and privacy.
+```
+adb shell settings put global hidden_api_policy 1
+# To turn off, use `adb shell settings delete hidden_api_policy`
+```
+
+Special optional setup using GrapheneOS-specific permissions:
 - You can use Storage Scopes and grant the `linux` folder (see below for location) instead of full storage access. <!-- UPDATE -->
 - You can either keep the Network permission on, or follow these to airgap the VM and the app: <!-- UPDATE -->
     1. Deny the Network permission to koiTerminal.
@@ -150,7 +158,7 @@ It seems from experience that, for some devices, anything higher than 6.6 will n
 
 ### Place the image
 
-The image (`image.tar.gz`) should be placed in a `linux` folder which sits at the "root" folder of your user, next to `Android/`, `Download/`, etc. For Storage Scopes on GrapheneOS, grant access to the `linux` folder.
+The image (`images.tar.gz`) should be placed in a `linux` folder which sits at the "root" folder of your user, next to `Android/`, `Download/`, etc. For Storage Scopes on GrapheneOS, grant access to the `linux` folder.
 ```
 user root
 |
@@ -160,7 +168,7 @@ user root
 |
 +- linux/
 |  |
-|  +- image.tar.gz
+|  +- images.tar.gz
 |
 +- (everything else)
 ```
