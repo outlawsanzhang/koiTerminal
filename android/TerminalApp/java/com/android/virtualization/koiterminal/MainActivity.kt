@@ -24,7 +24,6 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.graphics.fonts.FontStyle
-import android.media.MediaScannerConnection
 import android.widget.TextView
 import android.net.Uri
 import android.os.Build
@@ -58,6 +57,7 @@ import com.android.virtualization.koiterminal.VmLauncherService.VmLauncherServic
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import java.lang.NoSuchMethodError
 import java.net.MalformedURLException
 import java.net.URL
 import java.util.concurrent.CompletableFuture
@@ -278,12 +278,7 @@ public class MainActivity :
 
     override fun onPause() {
         super.onPause()
-        MediaScannerConnection.scanFile(
-            this,
-            arrayOf("/storage/emulated/${userId}/Download"),
-            null /* mimeTypes */,
-            null, /* callback */
-        )
+        // MediaScannerConnection not needed as VM has no access there
     }
 
     override fun onStart() {
@@ -472,7 +467,7 @@ public class MainActivity :
         val icon = Icon.createWithResource(resources, R.drawable.ic_launcher_foreground)
         val notification: Notification =
             Notification.Builder(this, Application.CHANNEL_LONG_RUNNING_ID)
-                .setSilent(true)
+                .apply { try { setSilent(true) } catch (e: NoSuchMethodError) {} }
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(resources.getString(R.string.service_notification_title))
                 .setContentText(resources.getString(R.string.service_notification_content))

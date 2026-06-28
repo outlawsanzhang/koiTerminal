@@ -58,6 +58,7 @@ import io.grpc.okhttp.OkHttpServerBuilder
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.lang.NoSuchMethodError
 import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.nio.file.Files
@@ -422,7 +423,7 @@ class VmLauncherService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(stopNotificationTitle)
             .setOngoing(true)
-            .setSilent(true)
+            .apply { try { setSilent(true) } catch (e: NoSuchMethodError) {} }
             .addAction(Notification.Action.Builder(icon, stopActionText, stopPendingIntent).build())
             .build()
     }
