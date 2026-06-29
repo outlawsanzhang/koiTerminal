@@ -17,8 +17,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.android.virtualization.koiterminal"
-    android:versionCode="2026062300"
-    android:versionName="2026062300">
+    android:versionCode="2026071500"
+    android:versionName="2026071500">
 
     <queries>
         <package android:name="com.google.android.apps.internal.betterbug" />
