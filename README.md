@@ -1,11 +1,17 @@
 # koiTerminal
 A more permissive version of the Linux Terminal app with finer VM permission control, forked from the GrapheneOS repo, supporting custom virtual machine images (such as Secureblue). Currently in proof-of-concept stage. <!-- UPDATE -->
 
+> [!IMPORTANT]
+> For GrapheneOS users, new restrictions since around 2026070500 require additional `adb` permission grants. Please search the [How to use](#how-to-use) section for `hidden_api`.
+
+
 <img src="https://raw.githubusercontent.com/outlawsanzhang/koiTerminal/refs/heads/koiterminal/assets/secureblue-2026032000.jpg" width="50%" height="50%">
 
 The main goal is to allow users to install this as a non-system, standalone app on a non-rooted device, and run a full VM with a Linux image that is not provided by Google.
 And does not rely on Google's image for installation.
 Because, come on, there was a NestBox app by kdrag0n that was able to do this years ago! Unfortunately, it was not maintained and stopped working on newer OS versions.
+
+This app mainly tests on the latest GrapheneOS, but should work on stock for Pixels too. Support for Samsung's One UI 8.5 is provided via a [legacy branch](https://github.com/outlawsanzhang/koiTerminal/tree/koiterminal-16).
 
 This repo also has an `upstreamable` branch that can potentially be merged into GrapheneOS, if they ever decide to do anything with it.
 
@@ -21,7 +27,7 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - [Disclaimers](#disclaimers)
 - [Plans](#progress-and-plans)
 - [How to use](#how-to-use)
-- [How to build](#how-to-build)
+- [How to build](#how-to-build-koiterminal)
 - [Misc](#misc)
 
 ## Added features<!-- UPDATE -->
@@ -39,14 +45,18 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 
 ## Disclaimers
 - Proof-of-concept pre-alpha test-build software, provided AS-IS. Beware of sharp edges, and back up often. You have been warned.
-- The app is only tested on newer devices running the latest GrapheneOS, so it would be nice to know if it works for other OSes at all.
+- The app is only tested on newer devices running the latest GrapheneOS (and One UI 8.5 at one point), so it would be nice to know if it works for other OSes.
   Many Android-based OSes and devices do not support Android Virtualization Framework, and may not be based on the latest version of AOSP.
-  In addition, 6th-generation Pixels require root to use AVF, so they are not supported.
+  The support may feel arbitrary. For example, it appears that Samsung's Galaxy Tab S10 FE supports AVF, but S10 Lite probably does not.
+  In addition, 6th-generation Pixels previously required root to use AVF, and it would be nice to know if that is still the case.
   This project does not aim to continuously support lower OS versions.
 - There is a decent chance that this will be abandonware, especially if a major part of this is upstreamed to GrapheneOS. Again, AS-IS.
 - Known sharp edges: <!-- UPDATE -->
     - Just crashes when files referenced in `vm_config.json` are not found, without indicating which.
     - Some images have issues, such as Alpine having network issues, and Secureblue not shutting down properly. See [IMAGES.md](IMAGES.md) for details.
+
+ - There is a decent chance that this will be abandonware, especially if a major part of this is upstreamed to GrapheneOS. Again, AS-IS.
+ - Known sharp edges: <!-- UPDATE -->
 
 ## Progress and plans
 Goals are mainly targeted at things that neither Google nor GrapheneOS is inclined to do in the near future.
@@ -67,6 +77,7 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Bug fixes and polishing to celebrate initial Secureblue image
 - [X] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
 - [X] Port to Android 17 version of VmTerminalApp
+- [X] Add support for One UI 8.5 on legacy branch
 - [ ] Build-time signature verification for Secureblue
 - [ ] Fix Secureblue image
     - [ ] Add support for display.
@@ -106,6 +117,8 @@ Suggested by community, but either may not be easily done or Google is better su
 - [ ] Custom fonts. Reference: https://github.com/tsl0922/ttyd/wiki/Serving-web-fonts (need to recompile ttyd)
 
 # How to use
+If you are using Android 16 (such as One UI 8.5), you MUST install the legacy version of the app, and then read this section from the [legacy branch](https://github.com/outlawsanzhang/koiTerminal/tree/koiterminal-16#how-to-use).
+
 ### Grant permissions
 After installing, the app needs to be manually given access to storage and VM permissions.
 All other permissions that the app will ask for are optional, but Nearby Devices is necessary if you want ttyd tabs.
@@ -115,16 +128,32 @@ For the storage permission, go to `Settings -> Apps -> Special app access -> All
 The VM permissions are trickier. These non-standard permissions require granting via `adb`. You can use a desktop, or use Termux as follows:
 ```
 pkg install android-tools # for Termux, install adb
+
 # Now, turn on developer options and enable wireless debugging. Then,
 adb pair localhost:????? # fill in the value from developer options
 adb connect localhost:????? # fill in the value from developer options
 adb shell pm list users # owner's ID is 0, others' can be obtained here
 adb shell pm grant --user ?? com.android.virtualization.koiterminal android.permission.MANAGE_VIRTUAL_MACHINE # fill in the user ID
 adb shell pm grant --user ?? com.android.virtualization.koiterminal android.permission.USE_CUSTOM_VIRTUAL_MACHINE # fill in the user ID
-# Don't forget to turn off wireless debugging afterwards.
+
+# Note: the command below grants ALL APPS access to hidden API that match `android.system.virtualmachine.VirtualMachine*`.
+# There are quite a few matching classes. If you are not comfortable with this, a more granular grant could be:
+#    adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/virtualmachine/VirtualMachineCustomImageConfig\$,Landroid/system/virtualmachine/VirtualMachineCustomImageConfig;,Landroid/system/virtualmachine/VirtualMachineConfig\$Builder;,Landroid/system/virtualmachine/VirtualMachineConfig;'"
+# To remove this grant, use `adb shell settings delete global hidden_api_blacklist_exemptions`
+adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/virtualmachine/VirtualMachine'"
+
+# Don't forget to turn off USB/wireless debugging (and probably developer options too) afterwards.
 ```
 
-Special setup using GrapheneOS-specific permissions:
+For One UI, the above should work too. If it does not, please open an issue.
+You can temporarily use the following alternative that grants ALL APPS a broad range of API usage,
+but note that this might be detrimental to security and privacy.
+```
+adb shell settings put global hidden_api_policy 1
+# To remove this grant, use `adb shell settings delete global hidden_api_policy`
+```
+
+Special optional setup using GrapheneOS-specific permissions:
 - You can use Storage Scopes and grant the `linux` folder (see below for location) instead of full storage access. <!-- UPDATE -->
 - You can either keep the Network permission on, or turn it off to airgap the VM and the app. koiTerminal will automatically remove network for the VM. <!-- UPDATE -->
 
@@ -150,7 +179,7 @@ It seems from experience that, for some devices, anything higher than 6.6 will n
 
 ### Place the image
 
-The image (`image.tar.gz`) should be placed in a `linux` folder which sits at the "root" folder of your user, next to `Android/`, `Download/`, etc. For Storage Scopes on GrapheneOS, grant access to the `linux` folder.
+The image (`images.tar.gz`) should be placed in a `linux` folder which sits at the "root" folder of your user, next to `Android/`, `Download/`, etc. For Storage Scopes on GrapheneOS, grant access to the `linux` folder.
 ```
 user root
 |
@@ -160,7 +189,7 @@ user root
 |
 +- linux/
 |  |
-|  +- image.tar.gz
+|  +- images.tar.gz
 |
 +- (everything else)
 ```
