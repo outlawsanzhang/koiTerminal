@@ -107,7 +107,9 @@ Suggested by community, but either may not be easily done or Google is better su
 
 # How to use
 ### Grant permissions
-After installing, the app needs to be given access to storage and VM permissions.
+After installing, the app needs to be manually given access to storage and VM permissions.
+All other permissions that the app will ask for are optional, but Nearby Devices is necessary if you want ttyd tabs.
+
 For the storage permission, go to `Settings -> Apps -> Special app access -> All files access -> koiTerminal`.
 
 The VM permissions are trickier. These non-standard permissions require granting via `adb`. You can use a desktop, or use Termux as follows:
@@ -174,6 +176,7 @@ This method works with the `Block connections without VPN` option since it conne
 Note the VM is still outside the VPN, connected straight to the Internet. <!-- UPDATE -->
 This method also works if the app's Network permission is denied in GrapheneOS.
 In this case, the VM will not have Internet access and will be airgapped.
+Debian may wait for network for about 2 minutes during boot.
 This console uses code from Termux, and inherits some of its features like zooming.
 If you close the serial console tab (and the VM stays alive because you still have ttyd tabs),
 you can press the add serial console tab button (plus sign with a tail <img src="https://i.kym-cdn.com/entries/icons/square/000/010/566/060.png" style="height: 2em"> <!-- UPDATE -->) to reconnect.
@@ -181,9 +184,13 @@ you can press the add serial console tab button (plus sign with a tail <img src=
 However, each VM can have only one serial console tab, unlike the multi-tab ttyd.
 For the Debian images, kernel logs may occasionally appear on your console and make a mess.
 
-(2) If the image supports ttyd (right now the NixOS and Debian images), then you can add ttyd tabs by pressing the "+" sign. <!-- UPDATE -->
-However, if you are using a VPN, it may block the local connection used to communicate with the VM.
-Make sure to turn off `Block connections without VPN` in the system settings, and enable your VPN's local network access if it also blocks local connections.
+(2) The ttyd console can be used if all of the following conditions are satisfied:
+    - The VM image supports ttyd (right now the NixOS and Debian images)
+    - You have granted the Nearby Devices permission
+    - If you are on GrapheneOS, you left the Network permission on
+    - If you are using a VPN, you turned off `Block connections without VPN` in the system settings
+    - If you are using a VPN and it has a setting that blocks local connections, you set it to not blocked
+In this case, you can add ttyd tabs by pressing the "+" sign. <!-- UPDATE -->
 
 # How to build koiTerminal
 Please see [BUILD.md](BUILD.md).

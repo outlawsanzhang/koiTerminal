@@ -128,9 +128,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshPermissionState() {
         val context = getApplication<Application>()
         // TODO(b/492409159): Remove this check if local network is no longer mandatory
-        _hasMandatoryPermissions.value =
-            context.checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) ==
-                PackageManager.PERMISSION_GRANTED
+        _hasMandatoryPermissions.value = true
     }
 
     fun handleIntent(intent: Intent) {
