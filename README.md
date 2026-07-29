@@ -21,7 +21,7 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - [Disclaimers](#disclaimers)
 - [Plans](#progress-and-plans)
 - [How to use](#how-to-use)
-- [How to build](#how-to-build)
+- [How to build](#how-to-build-koiterminal)
 - [Misc](#misc)
 
 ## Added features<!-- UPDATE -->
@@ -121,10 +121,12 @@ adb shell pm grant --user ?? com.android.virtualization.koiterminal android.perm
 ```
 
 For One UI, it seems one additional permission to call internal API is required.
-Note that this grants ALL apps the permission to do so, which mignt be detrimental to security and privacy.
 ```
-adb shell settings put global hidden_api_policy 1
-# To turn off, use `adb shell settings delete hidden_api_policy`
+# Note: the command below grants ALL APPS access to hidden API that match `android.system.virtualmachine.VirtualMachine*`.
+# There are quite a few matching classes. If you are not comfortable with this, a more granular grant could be:
+#    adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/virtualmachine/VirtualMachineCustomImageConfig\$,Landroid/system/virtualmachine/VirtualMachineCustomImageConfig;,Landroid/system/virtualmachine/VirtualMachineConfig\$Builder;,Landroid/system/virtualmachine/VirtualMachineConfig;'"
+adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/virtualmachine/VirtualMachine'"
+# To remove this grant, use `adb shell settings delete global hidden_api_blacklist_exemptions`
 ```
 
 Special optional setup using GrapheneOS-specific permissions:
