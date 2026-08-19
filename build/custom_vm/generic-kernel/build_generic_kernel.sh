@@ -89,7 +89,12 @@ build_custom_kernel() {
     ls "linux-${generic_kver}.tar.xz" || wget "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${generic_kver}.tar.xz"
     ls "linux-${generic_kver}.tar.sign" || wget "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${generic_kver}.tar.sign"
 
-    gpg2 --locate-keys torvalds@kernel.org gregkh@kernel.org 
+    # Get kernel signing keys by email && fingerprint
+    TMPGPG=$(mktemp -d --suffix -gpg)
+    GNUPGHOME="$TMPGPG" gpg2 --auto-key-locate nodefault,wkd --locate-keys torvalds@kernel.org gregkh@kernel.org
+    GNUPGHOME="$TMPGPG" gpg2 --armor --export ABAF11C65A2970B130ABE3C479BE3E4300411886 647F28654894E3BD457199BE38DBBDC86092693E > kernel_keys.asc
+    gpg2 --import kernel_keys.asc
+
     ls "linux-${generic_kver}.tar" || unxz --keep "linux-${generic_kver}.tar.xz"
     gpg2 --verify "linux-${generic_kver}.tar.sign"
     tar -xf "linux-${generic_kver}.tar"

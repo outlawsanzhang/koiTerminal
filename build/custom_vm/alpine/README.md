@@ -24,7 +24,7 @@ Download and verify the image:
 gpg2 --batch --keyserver keyserver.ubuntu.com --recv-keys 0482D84022F52DF1C4E7CD43293ACD0907D9495A
 wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/aarch64/alpine-virt-3.23.3-aarch64.iso
 wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/aarch64/alpine-virt-3.23.3-aarch64.iso.asc
-gpg2 --verify alpine-virt-3.23.3-aarch64.iso.asc 
+gpg2 --verify alpine-virt-3.23.3-aarch64.iso.asc
 ```
 Make a raw volume image:
 ```
