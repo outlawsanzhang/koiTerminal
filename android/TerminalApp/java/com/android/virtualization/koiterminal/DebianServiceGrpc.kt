@@ -16,10 +16,11 @@
 package com.android.virtualization.koiterminal
 
 import android.content.Context
+import android.system.virtualmachine.VirtualMachine
 import android.util.Log
 import androidx.annotation.Keep
 import com.android.internal.annotations.GuardedBy
-import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallback
+import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallbackImpl
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import com.android.virtualization.terminal.proto.DebianServiceGrpc.DebianServiceImplBase
 import com.android.virtualization.terminal.proto.ForwardingRequestItem
@@ -35,11 +36,16 @@ import io.grpc.stub.StreamObserver
 import java.lang.UnsatisfiedLinkError
 
 internal class DebianServiceGrpc(context: Context) : DebianServiceImplBase(), DebianServiceBase {
+    private var vm: VirtualMachine? = null
     private val portsStateManager = PortsStateManager.getInstance(context)
     private var portsStateListener: PortsStateManager.Listener? = null
     private var shutdownRunnable: Runnable? = null
     private val mLock = Object()
     @GuardedBy("mLock") private var storageBalloonCallback: StorageBalloonCallback? = null
+
+    fun setVm(vm: VirtualMachine) {
+        this.vm = vm
+    }
 
     override fun reportVmActivePorts(
         request: ReportVmActivePortsRequest,
@@ -68,7 +74,12 @@ internal class DebianServiceGrpc(context: Context) : DebianServiceImplBase(), De
             }
         portsStateManager.registerListener(portsStateListener!!)
         updateListeningPorts()
-        ForwarderHost.run(request.cid, ForwarderHostCallback(responseObserver))
+        val vm = this.vm
+        if (vm != null) {
+            ForwarderHost.run(request.cid, ForwarderHostCallback(responseObserver, vm))
+        } else {
+            Log.e(TAG, "OpenForwardingRequestQueue: vm == null. Cannot start ForwarderHost.run().")
+        }
         responseObserver.onCompleted()
     }
 
@@ -152,8 +163,9 @@ internal class DebianServiceGrpc(context: Context) : DebianServiceImplBase(), De
 
     @Keep
     private class ForwarderHostCallback(
-        private val responseObserver: StreamObserver<ForwardingRequestItem?>
-    ) : ForwardingCallback {
+        private val responseObserver: StreamObserver<ForwardingRequestItem?>,
+        vm: VirtualMachine
+    ) : ForwardingCallbackImpl(vm) {
 
         override fun onForwardingRequestReceived(guestTcpPort: Int, vsockPort: Int) {
             val item =

@@ -15,6 +15,10 @@
  */
 package com.android.virtualization.koiterminal
 
+import android.os.ParcelFileDescriptor
+import android.system.virtualmachine.VirtualMachine
+import android.util.Log
+
 object ForwarderHost {
     init {
         System.loadLibrary("forwarder_host_jni")
@@ -28,5 +32,43 @@ object ForwarderHost {
 
     interface ForwardingCallback {
         fun onForwardingRequestReceived(guestTcpPort: Int, vsockPort: Int)
+        fun hostConnectVsock(vsockPort: Int): Int
+        fun hostDisonnectVsock(vsockFd: Int)
+    }
+
+    abstract class ForwardingCallbackImpl(private val vm: VirtualMachine): ForwardingCallback {
+        private val connections: MutableMap<Int, ParcelFileDescriptor> = hashMapOf()
+
+        override fun hostConnectVsock(vsockPort: Int): Int {
+            for (retry in 1..RETRIES) {
+                try {
+                    val pfd = vm.connectVsock(vsockPort.toLong())
+                    val oldPfd = connections.remove(pfd.fd)
+                    oldPfd?.close()
+                    connections[pfd.fd] = pfd
+                    return pfd.fd
+                } catch (e: Exception) {
+                    if (retry == RETRIES) {
+                        Log.e("ForwarderHost", "ASDF hostConnectVsock failed (retry = ${retry})", e)
+                        throw e
+                    } else {
+                        Log.e("ForwarderHost", "ASDF hostConnectVsock failed (retry = ${retry}), ${e.message}")
+                    }
+                    Thread.sleep(RETRY_MS)
+                }
+            }
+            // Unreachable
+            return -1
+        }
+
+        override fun hostDisonnectVsock(vsockFd: Int) {
+            val pfd = connections.remove(vsockFd)
+            pfd?.close()
+        }
+
+        companion object {
+            private const val RETRIES = 5
+            private const val RETRY_MS = 300L
+        }
     }
 }

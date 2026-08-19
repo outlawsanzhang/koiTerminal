@@ -16,10 +16,13 @@
 
 package com.android.virtualization.koiterminal
 
+import android.os.ParcelFileDescriptor
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
 import android.system.VmSocketAddress
+import android.system.virtualmachine.VirtualMachine
+import android.system.virtualmachine.VirtualMachineException
 import android.util.Log
 import java.io.FileDescriptor
 import java.io.FileInputStream
@@ -35,7 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class AndroidToVmBridge(
-    private val vmCid: Int,
+    private val vm: VirtualMachine,
     private val vmPort: Int = 7681,
     public val secretKey: String = UUID.randomUUID().toString(),
 ) {
@@ -48,6 +51,7 @@ class AndroidToVmBridge(
         private const val BUFFER_SIZE = 8192
     }
 
+    private val vmCid: Int = vm.getCid()
     private val authCookie = "access_token=$secretKey"
     private var serverSocket: ServerSocket? = null
     private val isRunning = AtomicBoolean(false)
@@ -105,7 +109,7 @@ class AndroidToVmBridge(
     }
 
     private fun handleClient(clientSocket: Socket) {
-        var vsockFd: FileDescriptor? = null
+        var vsockFd: ParcelFileDescriptor? = null
         try {
             val clientIn = clientSocket.getInputStream()
             val clientOut = clientSocket.getOutputStream()
@@ -132,8 +136,8 @@ class AndroidToVmBridge(
             }
 
             // 3. Forward buffered headers first
-            val vmOut = FileOutputStream(vsockFd)
-            val vmIn = FileInputStream(vsockFd)
+            val vmOut = FileOutputStream(vsockFd.fileDescriptor)
+            val vmIn = FileInputStream(vsockFd.fileDescriptor)
 
             vmOut.write(buffer, 0, bytesRead)
             vmOut.flush()
@@ -145,9 +149,9 @@ class AndroidToVmBridge(
                 } catch (e: Exception) {
                     Log.v(TAG, "Error closing client socket", e)
                 }
-                if (vsockFd != null && vsockFd.valid()) {
+                if (vsockFd != null && vsockFd.fileDescriptor.valid()) {
                     try {
-                        Os.close(vsockFd)
+                        vsockFd.close()
                     } catch (e: Exception) {
                         Log.v(TAG, "Error closing vsock", e)
                     }
@@ -173,9 +177,9 @@ class AndroidToVmBridge(
             } catch (e: Exception) {
                 Log.v(TAG, "Error closing client socket", e)
             }
-            if (vsockFd != null && vsockFd.valid()) {
+            if (vsockFd != null && vsockFd.fileDescriptor.valid()) {
                 try {
-                    Os.close(vsockFd)
+                    vsockFd.close()
                 } catch (e: Exception) {
                     Log.v(TAG, "Error closing vsock", e)
                 }
@@ -185,34 +189,39 @@ class AndroidToVmBridge(
 
     // TODO(b/464250786): when a guest agent notifies the host when it is ready, we don't need to
     // keep trying until it is ready.
-    private fun connectWithRetry(): FileDescriptor? {
-        val vmAddress = VmSocketAddress(vmPort, vmCid)
+    private fun connectWithRetry(): ParcelFileDescriptor? {
+        // val vmAddress = VmSocketAddress(vmPort, vmCid)
 
         for (i in 1..MAX_RETRIES) {
             if (!isRunning.get()) return null
 
-            var fd: FileDescriptor? = null
+            var fd: ParcelFileDescriptor? = null
             try {
-                fd = Os.socket(OsConstants.AF_VSOCK, OsConstants.SOCK_STREAM, 0)
-                Os.connect(fd, vmAddress)
+                fd = vm.connectVsock(vmPort.toLong())
+                Log.d(TAG, "Connected vsock in AndroidToVmBridge as fd=${fd.fd}")
+                // fd = Os.socket(OsConstants.AF_VSOCK, OsConstants.SOCK_STREAM, 0)
+                // Os.connect(fd, vmAddress)
                 return fd
-            } catch (e: ErrnoException) {
-                if (fd != null && fd.valid()) {
-                    try {
-                        Os.close(fd)
-                    } catch (_: Exception) {}
-                }
+            } catch (e: Exception) {
+                val eIsFailedToConnect = e is VirtualMachineException && (e.cause?.message?.contains(Regex("""Failed to connect""")) == true)
+                if (e is ErrnoException || eIsFailedToConnect) {
+                    if (fd != null && fd.fileDescriptor.valid()) {
+                        try {
+                            fd.close()
+                        } catch (_: Exception) {}
+                    }
 
-                if (i == MAX_RETRIES) {
-                    Log.e(TAG, "VM connection failed after $MAX_RETRIES attempts")
+                    if (i == MAX_RETRIES) {
+                        Log.e(TAG, "VM connection failed after $MAX_RETRIES attempts", e)
+                        return null
+                    }
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS)
+                    } catch (_: InterruptedException) {}
+                } else {
+                    Log.e(TAG, "Unexpected error in connectWithRetry", e)
                     return null
                 }
-                try {
-                    Thread.sleep(RETRY_DELAY_MS)
-                } catch (_: InterruptedException) {}
-            } catch (e: Exception) {
-                Log.e(TAG, "Unexpected error in connectWithRetry", e)
-                return null
             }
         }
         return null

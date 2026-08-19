@@ -17,6 +17,7 @@ package com.android.virtualization.koiterminal
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.android.internal.annotations.GuardedBy
 import com.android.virtualization.terminal.proto.ActivePort
 import java.util.HashSet
@@ -106,6 +107,9 @@ class PortsStateManager private constructor(private val sharedPref: SharedPrefer
     // enabledPort's value change. Make this callback provide that information as well.
     private fun notifyPortsStateUpdated(oldActivePorts: Set<Int>, newActivePorts: Set<Int>) {
         synchronized(lock) { HashSet<Listener>(this@PortsStateManager.listeners) }
+            .apply {
+                Log.d("PortsStateManager", "PortsStateManager: broadcasting update notification to ${size} listeners")
+            }
             .forEach {
                 it.onPortsStateUpdated(HashSet<Int>(oldActivePorts), HashSet<Int>(newActivePorts))
             }
