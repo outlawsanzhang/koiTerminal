@@ -51,7 +51,7 @@ cd "${workdir}"
 apt install -y wget podman libguestfs-tools
 
 # Download and verify Fedora CoreOS
-gpg2 --batch --keyserver keyserver.ubuntu.com --recv-keys 0482D84022F52DF1C4E7CD43293ACD0907D9495A
+gpg2 --batch --keyserver keyserver.ubuntu.com --recv-keys C6E7F081CF80E13146676E88829B606631645531
 FEDORA_BUILD=43.20260217.3.1
 FEDORA_IMAGE=fedora-coreos-${FEDORA_BUILD}-qemu.aarch64.qcow2.xz
 ls "${FEDORA_IMAGE}" || wget "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/${FEDORA_BUILD}/aarch64/${FEDORA_IMAGE}"
