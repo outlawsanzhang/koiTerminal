@@ -19,16 +19,17 @@
 
 use std::collections::btree_map::Entry as BTreeMapEntry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::error::Error as stdError;
 use std::fmt;
 use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, TcpListener};
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::result;
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::Duration;
 
 use android_logger::Config;
 use forwarder::forwarder::ForwarderSession;
+use forwarder::stream::StreamSocket;
 use jni::objects::{JClass, JIntArray, JObject, JValue};
 use jni::sys::jint;
 use jni::JNIEnv;
@@ -36,12 +37,6 @@ use log::{debug, error, info, warn, LevelFilter};
 use nix::sys::eventfd::{EfdFlags, EventFd};
 use poll_token_derive::PollToken;
 use vmm_sys_util::poll::{PollContext, PollToken};
-use vsock::VsockListener;
-use vsock::VMADDR_CID_ANY;
-
-const CHUNNEL_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-
-const VMADDR_PORT_ANY: u32 = u32::MAX;
 
 static SHUTDOWN_EVT: LazyLock<EventFd> =
     LazyLock::new(|| EventFd::new().expect("Could not create shutdown eventfd"));
@@ -56,22 +51,17 @@ static UPDATE_QUEUE: LazyLock<Arc<Mutex<VecDeque<u16>>>> =
 #[remain::sorted]
 #[derive(Debug)]
 enum Error {
-    BindVsock(io::Error),
-    IncorrectCid(u32),
-    LaunchForwarderGuest(jni::errors::Error),
     NoListenerForPort(u16),
     NoSessionForTag(SessionTag),
     PollContextAdd(vmm_sys_util::errno::Error),
     PollContextDelete(vmm_sys_util::errno::Error),
     PollContextNew(vmm_sys_util::errno::Error),
     PollWait(vmm_sys_util::errno::Error),
-    SetVsockNonblocking(io::Error),
     TcpAccept(io::Error),
     TcpListenerPort(io::Error),
     UpdateEventRead(nix::Error),
-    VsockAccept(io::Error),
-    VsockAcceptTimeout,
-    VsockListenerPort(io::Error),
+    VsockConnect(jni::errors::Error),
+    VsockDisconnect(jni::errors::Error),
 }
 
 type Result<T> = result::Result<T, Error>;
@@ -83,24 +73,25 @@ impl fmt::Display for Error {
 
         #[remain::sorted]
         match self {
-            BindVsock(e) => write!(f, "failed to bind vsock: {e}"),
-            IncorrectCid(cid) => write!(f, "chunnel connection from unexpected cid {cid}"),
-            LaunchForwarderGuest(e) => write!(f, "failed to launch forwarder_guest {e}"),
             NoListenerForPort(port) => write!(f, "could not find listener for port: {port}"),
             NoSessionForTag(tag) => write!(f, "could not find session for tag: {tag:x}"),
             PollContextAdd(e) => write!(f, "failed to add fd to poll context: {e}"),
             PollContextDelete(e) => write!(f, "failed to delete fd from poll context: {e}"),
             PollContextNew(e) => write!(f, "failed to create poll context: {e}"),
             PollWait(e) => write!(f, "failed to wait for poll: {e}"),
-            SetVsockNonblocking(e) => write!(f, "failed to set vsock to nonblocking: {e}"),
             TcpAccept(e) => write!(f, "failed to accept tcp: {e}"),
             TcpListenerPort(e) => {
                 write!(f, "failed to read local sockaddr for tcp listener: {e}")
             }
             UpdateEventRead(e) => write!(f, "failed to read update eventfd: {e}"),
-            VsockAccept(e) => write!(f, "failed to accept vsock: {e}"),
-            VsockAcceptTimeout => write!(f, "timed out waiting for vsock connection"),
-            VsockListenerPort(e) => write!(f, "failed to get vsock listener port: {e}"),
+            VsockConnect(e) => {
+                let e_src = e.source();
+                write!(f, "failed to connect vsock: {e:#?}, {e_src:#?}")
+            },
+            VsockDisconnect(e) => {
+                let e_src = e.source();
+                write!(f, "failed to disconnect vsock: {e:#?}, {e_src:#?}")
+            },
         }
     }
 }
@@ -191,6 +182,7 @@ impl<'a> ForwarderSessions<'a> {
                     .add(&tcp6_listener, Token::Ipv6Listener(port))
                     .map_err(Error::PollContextAdd)?;
                 o.insert(PortListeners { tcp4_listener, tcp6_listener });
+                info!("forwarder_host listening to TCP4/6 port {port}");
             }
             active_ports.insert(port);
         }
@@ -205,6 +197,7 @@ impl<'a> ForwarderSessions<'a> {
                 let _listening_port = self.listening_ports.remove(port);
             }
         }
+        info!("forwarder_host ports: active {active_ports:?}, listening {0:?}", self.listening_ports.keys());
 
         // Consume the eventfd.
         UPDATE_EVT.read().map_err(Error::UpdateEventRead)?;
@@ -218,6 +211,7 @@ impl<'a> ForwarderSessions<'a> {
         port: u16,
         sock_family: SocketFamily,
     ) -> Result<()> {
+        info!("Incoming connection on port {port}");
         let port_listeners =
             self.listening_ports.get(&port).ok_or(Error::NoListenerForPort(port))?;
 
@@ -243,6 +237,7 @@ impl<'a> ForwarderSessions<'a> {
 
         self.tcp4_forwarders.insert(tag, session);
 
+        info!("Forwarder created and running for incoming connection on port {port}");
         Ok(())
     }
 
@@ -252,6 +247,8 @@ impl<'a> ForwarderSessions<'a> {
         if shutdown {
             poll_ctx.delete(session.local_stream()).map_err(Error::PollContextDelete)?;
             if session.is_shut_down() {
+                let vsock_rawfd = session.remote_stream().as_raw_fd();
+                self.close_vsock_connection(vsock_rawfd).ok();
                 self.tcp4_forwarders.remove(&tag);
             }
         }
@@ -269,10 +266,25 @@ impl<'a> ForwarderSessions<'a> {
         if shutdown {
             poll_ctx.delete(session.remote_stream()).map_err(Error::PollContextDelete)?;
             if session.is_shut_down() {
+                let vsock_rawfd = session.remote_stream().as_raw_fd();
+                self.close_vsock_connection(vsock_rawfd).ok();
                 self.tcp4_forwarders.remove(&tag);
             }
         }
 
+        Ok(())
+    }
+
+    fn close_vsock_connection(&mut self, fd: RawFd) -> Result<()> {
+        self.jni_env
+            .call_method(
+                &self.jni_cb,
+                "hostDisonnectVsock",
+                "(I)V",
+                #[allow(clippy::unnecessary_cast)]
+                &[JValue::Int(fd as i32)],
+            )
+            .map_err(Error::VsockDisconnect)?;
         Ok(())
     }
 
@@ -325,50 +337,52 @@ impl<'a> ForwarderSessions<'a> {
 /// Creates a forwarder session from a `listener` that has a pending connection to accept.
 fn create_forwarder_session(
     listener: &TcpListener,
-    cid: u32,
+    _cid: u32,
     jni_env: &mut JNIEnv,
     jni_cb: &JObject,
 ) -> Result<ForwarderSession> {
     let (tcp_stream, _) = listener.accept().map_err(Error::TcpAccept)?;
-    // Bind a vsock port, tell the guest to connect, and accept the connection.
-    let vsock_listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, VMADDR_PORT_ANY)
-        .map_err(Error::BindVsock)?;
-    vsock_listener.set_nonblocking(true).map_err(Error::SetVsockNonblocking)?;
+    // Cannot bind vsock ports due to permission issues. Use callback to obtain connection instead.
+    // Note that the original implementation is host=initiate + guest=connect,
+    // while using connectVsock() can only give you host=connect + guest=initiate.
+    // Therefore, a different guest/linux_vm_manager implementation is needed to switch from
+    //   socat VSOCK-CONNECT...
+    // to
+    //   socat VSOCK-LISTEN...
 
     let tcp4_port = listener.local_addr().map_err(Error::TcpListenerPort)?.port();
-    let vsock_port = vsock_listener.local_addr().map_err(Error::VsockListenerPort)?.port();
+    let vsock_port = tcp4_port;
+
+    // Ask guest to connect.
+    info!("forwarder_host setting up guest connection: VSOCK-LISTEN ({vsock_port}) > TCP-CONNECT ({tcp4_port})");
     jni_env
         .call_method(
             jni_cb,
             "onForwardingRequestReceived",
             "(II)V",
-            &[JValue::Int(tcp4_port.into()), JValue::Int(vsock_port as i32)],
+            &[JValue::Int(tcp4_port as i32), JValue::Int(vsock_port as i32)],
         )
-        .map_err(Error::LaunchForwarderGuest)?;
+        .map_err(Error::VsockConnect)?;
+    // brief wait for socat to come online
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
-    #[derive(PollToken)]
-    enum Token {
-        VsockAccept,
-    }
+    // Connect from host and assume that the guest is listening on the vsock.
+    info!("forwarder_host setting up connection: TCP-LISTEN ({tcp4_port}) > VSOCK-CONNECT ({vsock_port})");
+    let vsock_rawfd = jni_env
+        .call_method(
+            jni_cb,
+            "hostConnectVsock",
+            "(I)I",
+            &[JValue::Int(vsock_port as i32)],
+        )
+        .map_err(Error::VsockConnect)?
+        .i().map_err(Error::VsockConnect)?
+        as RawFd;
 
-    let poll_ctx: PollContext<Token> = PollContext::new().map_err(Error::PollContextNew)?;
-    poll_ctx.add(&vsock_listener, Token::VsockAccept).map_err(Error::PollContextAdd)?;
-
-    // Wait a few seconds for the guest to connect.
-    let events = poll_ctx.wait_timeout(CHUNNEL_CONNECT_TIMEOUT).map_err(Error::PollWait)?;
-
-    match events.iter_readable().next() {
-        Some(_) => {
-            let (vsock_stream, sockaddr) = vsock_listener.accept().map_err(Error::VsockAccept)?;
-
-            if sockaddr.cid() != cid {
-                Err(Error::IncorrectCid(sockaddr.cid()))
-            } else {
-                Ok(ForwarderSession::new(tcp_stream.into(), vsock_stream.into()))
-            }
-        }
-        None => Err(Error::VsockAcceptTimeout),
-    }
+    // The original workflow of listening for vsock connection does not apply.
+    // Simply try connecting the vsock.
+    // Safety: fd only used in rust, and closing in jni is called when done
+    Ok(ForwarderSession::new(tcp_stream.into(), unsafe { StreamSocket::from_raw_fd(vsock_rawfd) }))
 }
 
 fn run_forwarder_host(cid: i32, jni_env: JNIEnv, jni_cb: JObject) -> Result<()> {
@@ -402,6 +416,16 @@ pub extern "C" fn Java_com_android_virtualization_terminal_ForwarderHost_run(
         }
     }
 }
+/// Renamed. See above
+#[no_mangle]
+pub extern "C" fn Java_com_android_virtualization_koiterminal_ForwarderHost_run(
+    env: JNIEnv,
+    _clazz: JClass,
+    cid: jint,
+    callback: JObject,
+) {
+    Java_com_android_virtualization_terminal_ForwarderHost_run(env, _clazz, cid, callback);
+}
 
 /// JNI function for terminating forwarder_host.
 #[no_mangle]
@@ -411,6 +435,14 @@ pub extern "C" fn Java_com_android_virtualization_terminal_ForwarderHost_shutdow
 ) {
     SHUTDOWN_EVT.write(1).expect("Failed to write shutdown event FD");
 }
+/// Renamed. See above
+#[no_mangle]
+pub extern "C" fn Java_com_android_virtualization_koiterminal_ForwarderHost_shutdown(
+    _env: JNIEnv,
+    _clazz: JClass,
+) {
+    Java_com_android_virtualization_terminal_ForwarderHost_shutdown(_env, _clazz);
+}
 
 /// JNI function for updating listening ports.
 #[no_mangle]
@@ -419,6 +451,7 @@ pub extern "C" fn Java_com_android_virtualization_terminal_ForwarderHost_updateL
     _clazz: JClass,
     ports: JIntArray,
 ) {
+    info!("Java_com_android_virtualization_terminal_ForwarderHost_updateListeningPorts");
     let length = env.get_array_length(&ports).expect("Failed to get length of port array");
     let mut buf = vec![0; length as usize];
     env.get_int_array_region(ports, 0, &mut buf).expect("Failed to get port array");
@@ -429,4 +462,13 @@ pub extern "C" fn Java_com_android_virtualization_terminal_ForwarderHost_updateL
         update_queue.push_back(port.try_into().expect("Failed to add port into update queue"));
     }
     UPDATE_EVT.write(1).expect("failed to write update eventfd");
+}
+/// Renamed. See above
+#[no_mangle]
+pub extern "C" fn Java_com_android_virtualization_koiterminal_ForwarderHost_updateListeningPorts(
+    env: JNIEnv,
+    _clazz: JClass,
+    ports: JIntArray,
+) {
+    Java_com_android_virtualization_terminal_ForwarderHost_updateListeningPorts(env, _clazz, ports);
 }

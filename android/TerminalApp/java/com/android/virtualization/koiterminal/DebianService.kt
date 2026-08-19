@@ -18,11 +18,12 @@ package com.android.virtualization.koiterminal
 import android.content.Context
 import android.os.RemoteException
 import android.system.virtualizationcommon.IGuestAgent
+import android.system.virtualmachine.VirtualMachine
 import android.util.Log
 import androidx.annotation.Keep
 import com.android.virtualization.debian.aidl.IDebianService
 import com.android.virtualization.debian.aidl.IVmActivePortListener
-import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallback
+import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallbackImpl
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import com.android.virtualization.terminal.proto.ActivePort
 import kotlinx.coroutines.CoroutineScope
@@ -32,7 +33,7 @@ import kotlinx.coroutines.launch
 internal class DebianService(
     private val context: Context,
     private val scope: CoroutineScope,
-    private val cid: Int,
+    private val vm: VirtualMachine,
     private val guestAgent: IGuestAgent,
     private val service: IDebianService,
 ) : DebianServiceBase {
@@ -52,7 +53,7 @@ internal class DebianService(
 
         scope.launch(Dispatchers.IO) {
             try {
-                ForwarderHost.run(cid, ForwarderHostCallback(service))
+                ForwarderHost.run(vm.cid, ForwarderHostCallback(service, vm))
             } catch (e: Exception) {
                 Log.d(TAG, "Exception from JNI", e)
             }
@@ -98,10 +99,12 @@ internal class DebianService(
     }
 
     @Keep
-    private class ForwarderHostCallback(private val service: IDebianService) : ForwardingCallback {
+    private class ForwarderHostCallback(private val service: IDebianService, vm: VirtualMachine) : ForwardingCallbackImpl(vm) {
         override fun onForwardingRequestReceived(guestTcpPort: Int, vsockPort: Int) {
             try {
+                Log.d(TAG, "service.requestForwarding($guestTcpPort, $vsockPort)")
                 service.requestForwarding(guestTcpPort, vsockPort)
+                Log.d(TAG, "service.requestForwarding($guestTcpPort, $vsockPort) done")
             } catch (e: RemoteException) {
                 Log.e(
                     TAG,

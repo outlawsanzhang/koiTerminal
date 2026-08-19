@@ -181,6 +181,7 @@ object VmController {
                 val image = InstalledImage.getDefault(context)
                 val json = ConfigJson.from(context, image.configPath)
                 val configBuilder = json.toConfigBuilder(context)
+                Log.d(TAG, "image.isAidlGuestAgent=${image.isAidlGuestAgent()}")
                 _guestAgentController.value =
                     GuestAgentController(context, image.isAidlGuestAgent(), repositoryScope)
 
@@ -206,6 +207,7 @@ object VmController {
 
                 try {
                     val port = _guestAgentController.value!!.startServer()
+                    Log.d(TAG, "gRPC startServer() returns port=$port")
                     customImageConfigBuilder.addParam("debian_server_port=$port")
                 } catch (e: RuntimeException) {
                     // Ignore if failed due to revoked NETWORK permission on GrapheneOS
@@ -299,7 +301,7 @@ object VmController {
                             val debian_service = IDebianService.Stub.asInterface(binder)
 
                             val cid = vm!!.cid
-                            _guestAgentController.value?.start(cid, guestAgent, debian_service)
+                            _guestAgentController.value?.start(guestAgent, debian_service)
 
                             Log.d(TAG, "Guest agent ready")
                         }
@@ -328,6 +330,7 @@ object VmController {
                         throw e
                     }
                 }
+                _guestAgentController.value?.setVm(virtualMachine!!)
 
                 // Logger.setup(context, vm, Executors.newSingleThreadExecutor())
                 serialIO = NoLogger.setup(context, virtualMachine!!, Executors.newSingleThreadExecutor())
@@ -337,7 +340,7 @@ object VmController {
 
                 if (canUseTtydOverVsock()) {
                     Log.i(TAG, "Connect to ttyd using vsock")
-                    val bridge = AndroidToVmBridge(virtualMachine!!.cid)
+                    val bridge = AndroidToVmBridge(virtualMachine!!)
                     val port = bridge.start()
                     if (port == null) {
                         Log.e(TAG, "Failed to start bridge")

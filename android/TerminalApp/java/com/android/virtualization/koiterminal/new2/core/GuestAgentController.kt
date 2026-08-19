@@ -17,6 +17,7 @@ package com.android.virtualization.koiterminal.new2.core
 
 import android.content.Context
 import android.system.virtualizationcommon.IGuestAgent
+import android.system.virtualmachine.VirtualMachine
 import android.util.Log
 import com.android.virtualization.debian.aidl.IDebianService
 import com.android.virtualization.koiterminal.ClipboardController
@@ -43,6 +44,7 @@ class GuestAgentController(
     private val aidlGuestAgent: Boolean,
     private val scope: CoroutineScope,
 ) {
+    private var vm: VirtualMachine? = null
     private var server: Server? = null
     private var debianService: DebianServiceBase? = null
     private var clipboardController: ClipboardController? = null
@@ -64,29 +66,37 @@ class GuestAgentController(
             Log.w(TAG, "Ignoring gRPC setup. soong generated CIDATA implies AIDL communication.")
             return 0
         }
+        Log.d(TAG, "Starting guest agent controller with gRPC server")
         if (debianService != null) {
             Log.w(TAG, "GuestAgentController is started again. It might had been crashed.")
             stop()
         }
         val port = startDebianServerGrpc()
+        Log.d(TAG, "Started guest agent controller with gRPC server, port=$port")
         portsStateManager.registerListener(portsListener)
         updatePortsState()
         return port
     }
 
     @Synchronized
-    fun start(cid: Int, guestAgent: IGuestAgent, service: IDebianService) {
-        Log.d(TAG, "Starting guest agent controller with AIDL")
+    fun setVm(vm: VirtualMachine) {
+        this.vm = vm
+        (debianService as? DebianServiceGrpc)?.setVm(vm)
+    }
 
+    @Synchronized
+    fun start(guestAgent: IGuestAgent, service: IDebianService) {
         if (!aidlGuestAgent) {
             Log.w(TAG, "Ignoring AIDL setup. soong generated CIDATA is required")
             return
         }
+        val vm = this.vm!!
+        Log.d(TAG, "Starting guest agent controller with AIDL, cid=${vm.cid}")
         if (debianService != null) {
             Log.w(TAG, "GuestAgentController is started again. It might had been crashed.")
             stop() // Safely stop existing before recreating
         }
-        debianService = DebianService(context, scope, cid, guestAgent, service)
+        debianService = DebianService(context, scope, vm, guestAgent, service)
         clipboardController = ClipboardController(context, service)
         portsStateManager.registerListener(portsListener)
         updatePortsState()
@@ -118,6 +128,7 @@ class GuestAgentController(
 
     fun enablePortForwarding(port: Int, enable: Boolean) {
         portsStateManager.updateEnabledPort(port, enable)
+        Log.d(TAG, "portsStateManager.updateEnabledPort($port, $enable)")
     }
 
     private fun updatePortsState() {

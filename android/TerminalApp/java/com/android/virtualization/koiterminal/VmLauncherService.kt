@@ -266,7 +266,7 @@ class VmLauncherService : Service() {
 
         if (canUseTtydOverVsock()) {
             Log.i(TAG, "canUseTtydOverVsock() true")
-            val bridge = AndroidToVmBridge(virtualMachine.getCid())
+            val bridge = AndroidToVmBridge(virtualMachine)
             val port = bridge.start()
             Log.i(TAG, "canUseTtydOverVsock() bridge started, port = $port")
             if (port == null) {

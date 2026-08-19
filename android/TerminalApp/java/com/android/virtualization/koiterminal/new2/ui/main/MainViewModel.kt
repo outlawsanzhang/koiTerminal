@@ -273,7 +273,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        Log.i("ASDF", "MainViewModel.onCleared()")
+        Log.i("MainViewModel", "MainViewModel.onCleared()")
         super.onCleared()
         VmController.stop()
     }
@@ -371,7 +371,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     launch {
                         TerminalSessionRepository.sessions.collect { sessions ->
                             if (sessions.isEmpty()) {
-                                Log.i("ASDF", "MainViewModel.launch {if (sessions.isEmpty())}")
+                                Log.i("MainViewModel", "MainViewModel.launch {if (sessions.isEmpty())}")
                                 stopVm()
                             }
                         }

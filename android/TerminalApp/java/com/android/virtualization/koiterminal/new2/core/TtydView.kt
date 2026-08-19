@@ -349,6 +349,15 @@ class TtydView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
                         window.term.focus();
                         window.TerminalApp.onTerminalReady();
                     };
+                    var checkQuiet = function() {
+                        var xterm = document.querySelector('.terminal.xterm');
+                        if (window.term && xterm) {
+                            console.log("xterm found");
+                            setTimeout(notifyReady, 500);
+                        } else {
+                            setTimeout(checkQuiet, 100);
+                        }
+                    };
                     var check = function() {
                         var xterm = document.querySelector('.terminal.xterm');
                         if (window.term && xterm) {
@@ -356,7 +365,7 @@ class TtydView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
                             setTimeout(notifyReady, 500);
                         } else {
                             console.log("xterm not found. waiting...");
-                            setTimeout(check, 100);
+                            setTimeout(checkQuiet, 100);
                         }
                     };
                     check();
