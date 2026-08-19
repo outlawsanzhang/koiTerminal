@@ -25,9 +25,10 @@
 
 # Change the MIRROR_URL and SOURCE_ISO_NAME below. This script will automate the source ISO download, customization, and custom ISO creation
 # You can also download your own ISO into the directory of this script and paste the name of that iso into the SOURCE_ISO_NAME line below without changing the URL
-MIRROR_URL = "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Silverblue/aarch64/iso/"
-SOURCE_ISO_NAME = "Fedora-Silverblue-ostree-aarch64-43-1.6.iso"
-CHECKSUM_NAME = "Fedora-Silverblue-43-1.6-aarch64-CHECKSUM"
+# <!-- UPDATE --> OS version number
+MIRROR_URL = "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Silverblue/aarch64/iso/"
+SOURCE_ISO_NAME = "Fedora-Silverblue-ostree-aarch64-44-1.7.iso"
+CHECKSUM_NAME = "Fedora-Silverblue-44-1.7-aarch64-CHECKSUM"
 #MIRROR_URL = "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/"
 #SOURCE_ISO_NAME = "Rocky-9.0-x86_64-dvd.iso"
 #MIRROR_URL = "http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/iso/"

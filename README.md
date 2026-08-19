@@ -78,7 +78,7 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Allow being revoked INTERNET; automatically airgap VMs when INTERNET revoked
 - [X] Port to Android 17 version of VmTerminalApp
 - [X] Add support for One UI 8.5 on legacy branch
-- [ ] Build-time signature verification for Secureblue
+- [X] Build-time signature verification for Secureblue
 - [X] Add support for port forwarding, shutdown, etc.
 - [X]  (stretch) Experimental: Enable forcing the VM to use the host vpn
     - Supported by disabling network and including a managed SOCKS5 proxy

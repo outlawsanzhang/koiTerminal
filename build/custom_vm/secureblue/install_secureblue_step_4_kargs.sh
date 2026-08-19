@@ -3,6 +3,10 @@
 
 set -ex -o pipefail
 
+# restore deleted files
+rsync -a /usr/etc/containers/policy.json /etc/containers/policy.json
+rsync -a /usr/etc/containers/registries.d/secureblue.yaml /etc/containers/registries.d/secureblue.yaml
+
 rpm-ostree cancel
 # https://secureblue.dev/post-install
 echo -e 'y\ny\nn' | ujust set-kargs-hardening
