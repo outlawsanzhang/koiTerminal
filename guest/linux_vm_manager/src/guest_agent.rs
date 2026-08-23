@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use android_system_virtualizationcommon_non_microdroid::{
+use rsbinder::*;
+use crate::aidl;
+use {
     aidl::android::system::virtualizationcommon::IGuestAgent::{BnGuestAgent, IGuestAgent},
-    binder::{BinderFeatures, Interface, Result as BinderResult, Status, Strong},
 };
-use log::error;
+use log::{info, error};
 
 pub struct GuestAgent {}
 
@@ -24,8 +25,11 @@ impl Interface for GuestAgent {}
 
 impl GuestAgent {
     pub fn new_binder() -> Strong<dyn IGuestAgent> {
+        info!("Creating GuestAgent");
         let guest_agent = GuestAgent {};
-        BnGuestAgent::new_binder(guest_agent, BinderFeatures::default())
+        info!("Creating binder for GuestAgent");
+        // BnGuestAgent::new_binder_with_features(guest_agent, BinderFeatures::default())
+        BnGuestAgent::new_binder(guest_agent)
     }
 }
 
