@@ -67,7 +67,7 @@ class FileExposer : DocumentsProvider() {
 
     @WorkerThread
     override fun queryRoots(projection: Array<out String>?): Cursor {
-        Log.i(TAG, "queryRoots")
+        Log.d(TAG, "queryRoots")
         return MatrixCursor(projection ?: DEFAULT_ROOT_PROJECTION)
             .apply {
                 val row = newRow()
@@ -93,9 +93,26 @@ class FileExposer : DocumentsProvider() {
         return buildUri(documentIdToParent(documentId))
     }
 
+    fun isInScope(documentId: String, scope: String): Boolean {
+        val root = context?.filesDir ?: File(".")
+        val scope = File(root, scope).getCanonicalFile()
+        var parent: File? = File(root, documentId).getCanonicalFile()
+        while (parent != null) {
+            if (scope.equals(parent)) {
+                return true
+            }
+            parent = parent.getParentFile()
+        }
+        Log.w(TAG, "isInScope: $documentId not in scope $scope")
+        return false
+    }
+
+    fun isInScope(documentId: String, scope: String, childName: String): Boolean {
+        return isInScope(documentId, scope) && isInScope(File(documentId, childName).getPath(), scope)
+    }
+
     @WorkerThread
     fun addFileToCursor(documentId: String, cursor: MatrixCursor) {
-        Log.i(TAG, "addFileToCursor: $documentId")
         val context = context
         if (context == null) return
         val file = File(context.filesDir, documentId)
@@ -117,12 +134,14 @@ class FileExposer : DocumentsProvider() {
                 } else if (isDir) {
                     DocumentsContract.Document.FLAG_SUPPORTS_DELETE or
                     DocumentsContract.Document.FLAG_SUPPORTS_RENAME or
+                    DocumentsContract.Document.FLAG_SUPPORTS_MOVE or
                     DocumentsContract.Document.FLAG_SUPPORTS_REMOVE or
                     DocumentsContract.Document.FLAG_SUPPORTS_WRITE or
                     DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
                 } else {
                     DocumentsContract.Document.FLAG_SUPPORTS_DELETE or
                     DocumentsContract.Document.FLAG_SUPPORTS_RENAME or
+                    DocumentsContract.Document.FLAG_SUPPORTS_MOVE or
                     DocumentsContract.Document.FLAG_SUPPORTS_REMOVE or
                     DocumentsContract.Document.FLAG_SUPPORTS_WRITE
                 }
@@ -138,40 +157,38 @@ class FileExposer : DocumentsProvider() {
         projection: Array<out String>?,
         sortOrder: String?
     ): Cursor {
-        Log.i(TAG, "queryChildDocuments: $parentDocumentId")
+        Log.d(TAG, "queryChildDocuments: $parentDocumentId")
         return MatrixCursor(resolveProjection(projection)).apply {
             val context = context
-            if (context == null || parentDocumentId == null) return@apply
+            if (context == null || parentDocumentId == null || !isInScope(parentDocumentId, ".")) return@apply
             val parent = File(context.filesDir, parentDocumentId)
             parent.listFiles()?.forEach { file ->
                 addFileToCursor(File(parentDocumentId, file.getName()).getPath(), this)
             }
-            Log.i(TAG, "queryChildDocuments - done, ${this.getCount()} rows, ${this.getColumnCount()} columns")
+            Log.d(TAG, "queryChildDocuments - done, ${this.getCount()} rows, ${this.getColumnCount()} columns")
             setNotificationUri(context.getContentResolver(), buildUri(parentDocumentId))
         }
     }
 
     @WorkerThread
     override fun queryDocument(documentId: String?, projection: Array<out String>?): Cursor {
-        Log.i(TAG, "queryDocument: $documentId")
+        Log.d(TAG, "queryDocument: $documentId")
         return MatrixCursor(resolveProjection(projection)).apply {
             val context = context
-            if (context == null || documentId == null) return@apply
+            if (context == null || documentId == null || !isInScope(documentId, ".")) return@apply
             addFileToCursor(documentId, this)
-            Log.i(TAG, "queryDocument - done, ${this.getCount()} rows, ${this.getColumnCount()} columns")
+            Log.d(TAG, "queryDocument - done, ${this.getCount()} rows, ${this.getColumnCount()} columns")
             setNotificationUri(context.getContentResolver(), buildUri(documentId))
         }
     }
 
     @WorkerThread
-    override fun openDocument(documentId: String?, mode: String?, signal: CancellationSignal?):
-        ParcelFileDescriptor {
+    override fun openDocument(documentId: String?, mode: String?, signal: CancellationSignal?): ParcelFileDescriptor {
         Log.i(TAG, "openDocument, mode $mode: $documentId")
         val context = context
-        if (context == null || documentId == null || mode == null) throw FileNotFoundException(documentId)
+        if (context == null || documentId == null || mode == null || !isInScope(documentId, ".")) throw FileNotFoundException(documentId)
         val file = File(context.filesDir, documentId)
         val accessMode = ParcelFileDescriptor.parseMode(mode)
-        // val isWrite = mode.contains("w")
         context.getContentResolver().notifyChange(buildParentUri(documentId), null)
         return ParcelFileDescriptor.open(file, accessMode)
     }
@@ -180,13 +197,16 @@ class FileExposer : DocumentsProvider() {
     override fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
         Log.i(TAG, "createDocument: $parentDocumentId -> $displayName")
         val context = context
-        if (context == null || parentDocumentId == null || displayName == null){
+        if (context == null || parentDocumentId == null || displayName == null || !isInScope(parentDocumentId, ".", displayName)){
             throw FileNotFoundException("$parentDocumentId -> $displayName")
         }
         val parent = File(context.filesDir, parentDocumentId)
         val file = File(parent, displayName)
-        if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) file.mkdir()
-        else file.createNewFile()
+        if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) file.mkdir() // assumes a call on an existing directory means not doing anything
+        else {
+            file.delete() // delete if exists
+            file.createNewFile()
+        }
         context.getContentResolver().notifyChange(buildUri(parentDocumentId), null)
         return File(parentDocumentId, displayName).getPath()
     }
@@ -194,7 +214,7 @@ class FileExposer : DocumentsProvider() {
     @WorkerThread
     override fun deleteDocument(documentId: String?) {
         Log.i(TAG, "deleteDocument: $documentId")
-        if (documentId == null) return
+        if (documentId == null || !isInScope(documentId, ".")) return
         removeDocument(documentId, null)
     }
 
@@ -202,7 +222,7 @@ class FileExposer : DocumentsProvider() {
     override fun removeDocument(documentId: String?, parentDocumentId: String?) {
         Log.i(TAG, "removeDocument: $documentId")
         context?.let {
-            if (documentId == null) return
+            if (documentId == null || !isInScope(documentId, ".")) return
             var file = File(it.filesDir, documentId)
             if (file.isDirectory()) {
                 file.deleteRecursively()
@@ -214,19 +234,60 @@ class FileExposer : DocumentsProvider() {
     }
     
     @WorkerThread
-    override fun renameDocument(documentId: String?, displayName: String?): String? {
-        Log.i(TAG, "renameDocument: $documentId -> $displayName")
+    fun mvDocument(documentId: String, documentNewId: String): String {
         context?.let {
-            if (documentId == null || displayName == null) return documentId
+            if (!isInScope(documentId, ".") || !isInScope(documentNewId, ".")) return documentId
             var file = File(it.filesDir, documentId)
-            var documentNewId = File(documentIdToParent(documentId), displayName).getPath()
             if (file.renameTo(File(it.filesDir, documentNewId))) {
                 it.getContentResolver().notifyChange(buildParentUri(documentId), null)
+                it.getContentResolver().notifyChange(buildParentUri(documentNewId), null)
                 return documentNewId
             }
         }
         return documentId
     }
     
+    @WorkerThread
+    override fun moveDocument(documentId: String?, sourceParentDocumentId: String?, parentDocumentId: String?): String? {
+        Log.i(TAG, "moveDocument: $documentId -> $parentDocumentId")
+        if (documentId == null || parentDocumentId == null) return documentId
+        return mvDocument(documentId, File(parentDocumentId, File(documentId).getName()).getPath())
+    }
+    
+    @WorkerThread
+    override fun renameDocument(documentId: String?, displayName: String?): String? {
+        Log.i(TAG, "renameDocument: $documentId -> $displayName")
+        if (documentId == null || displayName == null) return documentId
+        // It's fine if displayName is a relative path as long as it's still in scope
+        return mvDocument(documentId, File(documentIdToParent(documentId), displayName).getPath())
+    }
+    
+    @WorkerThread
+    override fun findDocumentPath(parentDocumentId: String?, documentId: String?): DocumentsContract.Path? {
+        Log.i(TAG, "findDocumentPath: $parentDocumentId -> $documentId")
+        if (documentId == null || !isInScope(documentId, ".")) return null
+
+        val root = context?.filesDir ?: File(".")
+        var paths = mutableListOf<String>()
+        val scope = root.getCanonicalFile()
+        var parent: File? = File(root, documentId).getCanonicalFile()
+        while (parent != null) {
+            if (scope.equals(parent)) {
+                break
+            }
+            paths.add(parent.getName())
+            parent = parent.getParentFile()
+        }
+        return DocumentsContract.Path(ROOT_FILES_ID, buildList {
+            var path = StringBuilder(".")
+            add(path.toString())
+            paths.asReversed().forEach {
+                path.append("/")
+                path.append(it)
+                add(path.toString())
+            }
+            Log.i(TAG, "findDocumentPath: $paths")
+        })
+    }
 }
 
