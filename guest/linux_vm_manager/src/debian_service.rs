@@ -13,19 +13,19 @@
 // limitations under the License.
 
 use anyhow::anyhow;
-use debian_aidl_interface::{
+use rsbinder::*;
+use crate::aidl;
+use {
     aidl::com::android::virtualization::debian::aidl::{
         IDebianService::{BnDebianService, IDebianService, VSOCK_PORT},
         IVmActivePortListener::ActivePort::ActivePort,
         IVmActivePortListener::IVmActivePortListener,
     },
-    binder::{BinderFeatures, Interface, Result as BinderResult, Status, Strong},
 };
-use log::{debug, error, warn};
-use rpcbinder::RpcServer;
+use log::{debug, error, info, warn};
+use rsbinder::rpc::{RpcServer, wire_android13::PROTOCOL_V2};
 use std::future::Future;
 use tokio::runtime::Runtime;
-use vsock::VMADDR_CID_ANY;
 
 pub struct DebianService {
     rt: Runtime,
@@ -34,16 +34,33 @@ pub struct DebianService {
 impl Interface for DebianService {}
 
 impl DebianService {
-    pub fn new_rpc_server() -> RpcServer {
+    pub fn new_rpc_server() -> std::sync::Arc<RpcServer> {
+        info!("Preparing DebianService");
         let rt = create_tokio_runtime();
         let service = DebianService { rt };
 
-        let binder = BnDebianService::new_binder(service, BinderFeatures::default());
+        let binder = BnDebianService::new_binder_with_features(service, BinderFeatures::default());
 
-        let vsock_port = VSOCK_PORT.try_into().unwrap();
-        let (server, _) = RpcServer::new_vsock(binder.as_binder(), VMADDR_CID_ANY, vsock_port)
-            .expect("Failed to start debian service rpc server");
+        let vsock_port: u32 = VSOCK_PORT.try_into().unwrap();
+        let socket = "/tmp/IDS.socket";
+        std::fs::remove_file(socket).ok();
+        info!("Setting up debian service rpc server at {socket}");
+        let server = RpcServer::setup_unix_server(socket)
+            .expect(format!("Failed to start debian service rpc server at {socket}").as_str());
+        info!("Setting debian service rpc to Android 13+ protocol");
+        server.set_android13plus(PROTOCOL_V2);
+        if let Err(e) = std::process::Command::new("socat")
+            .arg("-d0")
+            .arg(format!("VSOCK-LISTEN:{vsock_port},reuseaddr,fork"))
+            .arg(format!("UNIX-CONNECT:{socket}"))
+            .spawn() {
+            error!("Could not spawn socat VSOCK-LISTEN:{vsock_port} <> {socket}: {e:?}");
+        }
+        info!("Spawned socat VSOCK-LISTEN:{vsock_port} <> {socket}");
         server.set_max_threads(4);
+        server.set_root(binder.as_binder());
+        info!("Configured debian service rpc server");
+        server.run_background();
         server
     }
 }
@@ -64,12 +81,13 @@ fn force_send<F: Future + Send>(f: F) -> impl Future<Output = F::Output> + Send 
 
 fn forward_port(tcp_port: u16, vsock_port: u32) {
     // Use std::process::Command which doesn't require Tokio context.
+    info!("Forwarding port: TCP-CONNECT:127.0.0.1:{tcp_port} <> VSOCK-LISTEN:{vsock_port}");
     if let Err(e) = std::process::Command::new("socat")
-        .arg(format!("TCP:127.0.0.1:{tcp_port}"))
-        .arg(format!("VSOCK-CONNECT:2:{vsock_port}"))
+        .arg(format!("TCP-CONNECT:127.0.0.1:{tcp_port}"))
+        .arg(format!("VSOCK-LISTEN:{vsock_port}"))
         .spawn()
     {
-        error!("Failed to launch socatwith port forwarding mode, tcp_port={tcp_port}, vsock_port={vsock_port}, err={e:?}");
+        error!("Failed to launch socat with port forwarding mode, tcp_port={tcp_port}, vsock_port={vsock_port}, err={e:?}");
     }
 }
 
@@ -78,6 +96,7 @@ impl IDebianService for DebianService {
         &self,
         listener: &Strong<dyn IVmActivePortListener>,
     ) -> BinderResult<()> {
+        info!("DebianService: attaching active port listener");
         let listener = listener.clone();
         self.rt.spawn(async move {
             let ret =
@@ -90,6 +109,7 @@ impl IDebianService for DebianService {
                         })
                         .collect();
 
+                    info!("Updated active ports: {ports:?}");
                     listener
                         .reportActivePorts(&ports)
                         .map_err(|e| anyhow!("Error in reportActivePorts(), {e:?}"))
@@ -115,12 +135,9 @@ impl IDebianService for DebianService {
         Ok(())
     }
 
-    fn requestStorageBalloon(&self, available_bytes: i64) -> BinderResult<()> {
-        let available_bytes = available_bytes.try_into().unwrap();
-        storage_balloon_agent::do_storage_ballooning(available_bytes).map_err(|e| {
-            error!("Error in storage_balloon_agent(), {e:?}");
-            Status::new_service_specific_error(-1, None)
-        })
+    fn requestStorageBalloon(&self, _available_bytes: i64) -> BinderResult<()> {
+        warn!("requestStorageBalloon not supported");
+        Err(Status::new_service_specific_error(-1, None))
     }
 
     fn updateClipboard(&self, text: &str) -> BinderResult<()> {

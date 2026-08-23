@@ -4,7 +4,7 @@ package {
 
 // Note: Do not add `static_executable: true`. Otherwise SIGSEGV will happen
 //       when calling binder API.
-rust_binary_host {
+rust_binary {
     name: "linux_vm_manager",
     crate_name: "linux_vm_manager",
     srcs: ["src/main.rs"],
@@ -25,4 +25,5 @@ rust_binary_host {
         "libtokio",
         "libvsock",
     ],
+    host_supported: true,
 }
