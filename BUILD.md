@@ -1,4 +1,5 @@
 # How to build koiTerminal
+
 ### Build the OS first
 The upstream app is designed to be a component of AOSP, and leverages system APIs such as `android.system.virtualmachine.VirtualMachineManager`.
 Therefore, it seems that this app cannot be built normally and has to be built with the OS build system.
@@ -81,3 +82,21 @@ cp out/target/product/$DEVICE/apex/com.android.virt/priv-app/VmTerminalApp@*/VmT
 out_adevtool_deps/host/linux-x86/bin/apksigner sign --ks keys/$DEVICE/vm-app-signing.jks $RELEASE_OUT/VmTerminalApp.apk
 ```
 
+### Android Studio build
+This doesn't work yet - it only builds enough of the UI for install, but running VMs doesn't work yet
+
+1. Install:
+  - Android Platform 37.0 and Build Tools 36.0.0
+  - Rust
+  - Rust Android targets
+  - cargo-ndk
+2. Download modified `android.jar`:
+```
+cd koiTerminal
+./tools/setup.sh
+```
+3. Build Rust:
+```
+./tools/build_rust.sh
+```
+4. build in Android Studio

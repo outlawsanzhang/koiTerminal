@@ -1,0 +1,22 @@
+[package]
+name = "forwarder_host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+forwarder = { path = "../../../libs/libforwarder" }
+jni = "=0.21.1"
+nix = { version = "=0.29.0", features = ["event"] }
+android_logger = "=0.15.1"
+vsock = "=0.5.2"
+vmm-sys-util = "=0.15.0"
+poll_token_derive = "=0.1.0"
+log = "=0.4.29"
+remain = "=0.2.16"
+tokio = { version = "=1.50.0", features = ["rt-multi-thread", "net"] }
+fast-socks5 = "=1.0.0"
+
+[lib]
+name = "forwarder_host_jni"
+crate-type = ["cdylib"]
+path = "../../../android/forwarder_host/src/forwarder_host.rs"
