@@ -18,6 +18,7 @@ mod debian_service;
 mod guest_agent;
 
 use rsbinder::*;
+#[allow(clippy::all)]
 mod aidl {
     rsbinder::include_aidl!("aidl");
 }
@@ -25,6 +26,7 @@ use guest_agent::GuestAgent;
 // use debian_aidl_interface::binder::Strong;
 use aidl::android::system::virtualmachineservice::IVirtualMachineService::IVirtualMachineService;
 use crate::debian_service::DebianService;
+use crate::debian_service::KoiService;
 use anyhow::{Context, Result};
 use rsbinder::rpc::{RpcSession, wire_android13::PROTOCOL_V2};
 use vsock::VMADDR_CID_HOST;
@@ -106,6 +108,10 @@ fn main() -> Result<()> {
     let debian_server = DebianService::new_rpc_server();
     info!("DebianService::new_rpc_server() completed");
 
+    info!("KoiService::new_rpc_server()");
+    let koi_server = KoiService::new_rpc_server();
+    info!("KoiService::new_rpc_server() completed");
+
     let death_recipient = Arc::new(DeathReporter::new("IVirtualMachineService"));
     let session_service = get_vms_rpc_binder(death_recipient.clone());
     match session_service {
@@ -128,6 +134,7 @@ fn main() -> Result<()> {
     info!("Sleeping for one millennium"); // lol
     thread::sleep(time::Duration::from_hours(24*365242));
     debian_server.join_workers();
+    koi_server.join_workers();
 
     info!("linux_vm_manager is shutting down");
 

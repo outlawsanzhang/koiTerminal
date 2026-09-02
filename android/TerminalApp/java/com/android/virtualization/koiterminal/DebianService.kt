@@ -22,8 +22,11 @@ import android.system.virtualmachine.VirtualMachine
 import android.util.Log
 import androidx.annotation.Keep
 import com.android.virtualization.debian.aidl.IDebianService
+import com.android.virtualization.debian.aidl.IkoiService
+import com.android.virtualization.debian.aidl.IkoiHostCallback
 import com.android.virtualization.debian.aidl.IVmActivePortListener
 import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallbackImpl
+import com.android.virtualization.koiterminal.ForwarderHostSetup
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import com.android.virtualization.terminal.proto.ActivePort
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +38,7 @@ internal class DebianService(
     private val scope: CoroutineScope,
     private val vm: VirtualMachine,
     private val guestAgent: IGuestAgent,
+    private val koi_service: IkoiService?,
     private val service: IDebianService,
 ) : DebianServiceBase {
     private lateinit var portsStateManager: PortsStateManager
@@ -44,6 +48,7 @@ internal class DebianService(
                 updateListeningPorts()
             }
         }
+    private val koiService = KoiService(context, scope, vm, koi_service)
     private val vmActivePortsListener = VmActivePortsListener()
 
     init {
@@ -53,7 +58,8 @@ internal class DebianService(
 
         scope.launch(Dispatchers.IO) {
             try {
-                ForwarderHost.run(vm.cid, ForwarderHostCallback(service, vm))
+                val setup = ForwarderHostSetup(koiService.getRcServicesAndSetupGuest())
+                ForwarderHost.run(vm.cid, setup, ForwarderHostCallback(service, vm))
             } catch (e: Exception) {
                 Log.d(TAG, "Exception from JNI", e)
             }
@@ -120,5 +126,36 @@ internal class DebianService(
         val enabledPorts: Set<Int> = portsStateManager.getEnabledPorts()
         val ports = activePorts.filter { enabledPorts.contains(it) }.toIntArray()
         ForwarderHost.updateListeningPorts(ports)
+    }
+}
+
+internal class KoiService(
+    private val context: Context,
+    private val scope: CoroutineScope,
+    private val vm: VirtualMachine,
+    private val service: IkoiService?,
+) {
+    private val callback = KoiHostCallback()
+
+    init {
+        service?.let { service ->
+            service.registerHostCallback(callback)
+        }
+    }
+
+    fun getRcServicesAndSetupGuest(): IntArray {
+        return if (service == null) {
+            intArrayOf()
+        } else {
+            service.openReverseConnectedPort(ForwarderHost.defaults.SOCKS5_PORT)
+            intArrayOf(ForwarderHost.defaults.REVCONN_SOCKS5_PROXY)
+        }
+    }
+
+    @Keep
+    private class KoiHostCallback() : IkoiHostCallback.Stub() {
+        override fun requestReverseConnection(vsockPort: Int) {
+            ForwarderHost.requestReverseConnection(vsockPort)
+        }
     }
 }

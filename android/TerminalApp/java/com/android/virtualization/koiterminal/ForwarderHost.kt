@@ -18,13 +18,26 @@ package com.android.virtualization.koiterminal
 import android.os.ParcelFileDescriptor
 import android.system.virtualmachine.VirtualMachine
 import android.util.Log
+import com.android.virtualization.debian.aidl.IkoiService
+
+data class ForwarderHostSetup(
+    val rcServices: IntArray = intArrayOf(),
+) {
+    val REVCONN_SOCKS5_PROXY = 0 // There could potentially be more to come, such as an NFS
+    val SOCKS5_PORT = IkoiService.SOCKS5_PORT.toInt()
+}
 
 object ForwarderHost {
+    // To be synced with android/forwarder_host/src/forwarder_host.rs
+    public val defaults = ForwarderHostSetup()
+
     init {
         System.loadLibrary("forwarder_host_jni")
     }
 
-    @JvmStatic external fun run(cid: Int, callback: ForwardingCallback?)
+    @JvmStatic external fun run(cid: Int, setup: ForwarderHostSetup, callback: ForwardingCallback?)
+
+    @JvmStatic external fun requestReverseConnection(vsockPort: Int)
 
     @JvmStatic external fun shutdown()
 
@@ -33,13 +46,14 @@ object ForwarderHost {
     interface ForwardingCallback {
         fun onForwardingRequestReceived(guestTcpPort: Int, vsockPort: Int)
         fun hostConnectVsock(vsockPort: Int): Int
-        fun hostDisonnectVsock(vsockFd: Int)
+        fun hostDisconnectVsock(vsockFd: Int)
     }
 
     abstract class ForwardingCallbackImpl(private val vm: VirtualMachine): ForwardingCallback {
         private val connections: MutableMap<Int, ParcelFileDescriptor> = hashMapOf()
 
         override fun hostConnectVsock(vsockPort: Int): Int {
+            Log.d("ForwarderHost", "ForwarderHost hostConnectVsock called on port $vsockPort (retries = ${RETRIES})")
             for (retry in 1..RETRIES) {
                 try {
                     val pfd = vm.connectVsock(vsockPort.toLong())
@@ -49,10 +63,10 @@ object ForwarderHost {
                     return pfd.fd
                 } catch (e: Exception) {
                     if (retry == RETRIES) {
-                        Log.e("ForwarderHost", "ASDF hostConnectVsock failed (retry = ${retry})", e)
+                        Log.e("ForwarderHost", "ForwarderHost hostConnectVsock failed (retry = ${retry})", e)
                         throw e
                     } else {
-                        Log.e("ForwarderHost", "ASDF hostConnectVsock failed (retry = ${retry}), ${e.message}")
+                        Log.e("ForwarderHost", "ForwarderHost hostConnectVsock failed (retry = ${retry}), ${e.message}")
                     }
                     Thread.sleep(RETRY_MS)
                 }
@@ -61,9 +75,27 @@ object ForwarderHost {
             return -1
         }
 
-        override fun hostDisonnectVsock(vsockFd: Int) {
-            val pfd = connections.remove(vsockFd)
-            pfd?.close()
+        override fun hostDisconnectVsock(vsockFd: Int) {
+            if (vsockFd == -1) {
+                // Shortcut for disconnect all
+                for ((key, pfd) in connections) {
+                    try {
+                        pfd.close()
+                    } catch (e: Exception) {
+                        Log.e("ForwarderHost", "ForwarderHost hostDisconnectVsock failed on pfd=${pfd.fd}", e)
+                    }
+                }
+                connections.clear()
+                Log.d("ForwarderHost", "ForwarderHost hostDisconnectVsock fd=$vsockFd (disconnect all)")
+            } else {
+                try {
+                    val pfd = connections.remove(vsockFd)
+                    pfd?.close()
+                    Log.d("ForwarderHost", "ForwarderHost hostDisconnectVsock fd=$vsockFd (remaining = ${connections.size})")
+                } catch (e: Exception) {
+                    Log.e("ForwarderHost", "ForwarderHost hostDisconnectVsock failed", e)
+                }
+            }
         }
 
         companion object {

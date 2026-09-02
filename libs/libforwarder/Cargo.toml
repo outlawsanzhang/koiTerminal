@@ -5,5 +5,7 @@ edition = "2021"
 
 [dependencies]
 libc = "0.2.159"
+log = "0.4.22"
 remain = "0.2.14"
+tokio = { version = "1.40.0", features = ["rt-multi-thread"] }
 vsock = "0.5.1"

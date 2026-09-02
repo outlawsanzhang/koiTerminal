@@ -76,7 +76,7 @@ internal class DebianServiceGrpc(context: Context) : DebianServiceImplBase(), De
         updateListeningPorts()
         val vm = this.vm
         if (vm != null) {
-            ForwarderHost.run(request.cid, ForwarderHostCallback(responseObserver, vm))
+            ForwarderHost.run(request.cid, ForwarderHost.defaults, ForwarderHostCallback(responseObserver, vm))
         } else {
             Log.e(TAG, "OpenForwardingRequestQueue: vm == null. Cannot start ForwarderHost.run().")
         }

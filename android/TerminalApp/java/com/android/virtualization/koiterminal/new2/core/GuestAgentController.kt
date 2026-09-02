@@ -20,6 +20,7 @@ import android.system.virtualizationcommon.IGuestAgent
 import android.system.virtualmachine.VirtualMachine
 import android.util.Log
 import com.android.virtualization.debian.aidl.IDebianService
+import com.android.virtualization.debian.aidl.IkoiService
 import com.android.virtualization.koiterminal.ClipboardController
 import com.android.virtualization.koiterminal.DebianService
 import com.android.virtualization.koiterminal.DebianServiceBase
@@ -85,7 +86,7 @@ class GuestAgentController(
     }
 
     @Synchronized
-    fun start(guestAgent: IGuestAgent, service: IDebianService) {
+    fun start(guestAgent: IGuestAgent, service: IDebianService, koi_service: IkoiService?) {
         if (!aidlGuestAgent) {
             Log.w(TAG, "Ignoring AIDL setup. soong generated CIDATA is required")
             return
@@ -96,11 +97,13 @@ class GuestAgentController(
             Log.w(TAG, "GuestAgentController is started again. It might had been crashed.")
             stop() // Safely stop existing before recreating
         }
-        debianService = DebianService(context, scope, vm, guestAgent, service)
+        debianService = DebianService(context, scope, vm, guestAgent, koi_service, service)
         clipboardController = ClipboardController(context, service)
         portsStateManager.registerListener(portsListener)
         updatePortsState()
-        StorageBalloonWorker.start(context, debianService!!)
+        if (koi_service == null || koi_service.supportsStorageBalloon()) {
+            StorageBalloonWorker.start(context, debianService!!)
+        }
     }
 
     @Synchronized

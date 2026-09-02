@@ -32,6 +32,7 @@ import android.system.virtualmachine.VirtualMachineManager
 import android.util.Log
 import com.android.system.virtualmachine.flags.Flags
 import com.android.virtualization.debian.aidl.IDebianService
+import com.android.virtualization.debian.aidl.IkoiService
 import com.android.virtualization.koiterminal.AndroidToVmBridge
 import com.android.virtualization.koiterminal.CertificateUtils
 import com.android.virtualization.koiterminal.ConfigJson
@@ -300,8 +301,16 @@ object VmController {
                             }
                             val debian_service = IDebianService.Stub.asInterface(binder)
 
+                            var koi_binder: IBinder? = null
+                            try {
+                                koi_binder = vm.connectToVsockServer(IkoiService.VSOCK_PORT)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Guest koiService agent cannot be registered", e)
+                            }
+                            val koi_service = koi_binder?.let { IkoiService.Stub.asInterface(it) }
+
                             val cid = vm!!.cid
-                            _guestAgentController.value?.start(guestAgent, debian_service)
+                            _guestAgentController.value?.start(guestAgent, debian_service, koi_service)
 
                             Log.d(TAG, "Guest agent ready")
                         }
