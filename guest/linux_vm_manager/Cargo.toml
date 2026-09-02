@@ -9,6 +9,7 @@ anyhow = "1.0.94"
 rsbinder = { version = "0.10", features = ["tokio", "async", "rpc-vsock", "android_16_plus"] }
 env_logger = "0.11.5"
 forwarder_guest_launcher = { path = "../forwarder_guest_launcher" }
+forwarder = { path = "../../libs/libforwarder" }
 log = "0.4.22"
 shutdown_runner = { path = "../shutdown_runner" }
 tokio = { version = "1.40.0", features = ["rt-multi-thread"] }

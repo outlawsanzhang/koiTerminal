@@ -9,10 +9,12 @@ rust_ffi_shared {
     srcs: ["src/forwarder_host.rs"],
     rustlibs: [
         "libandroid_logger",
+        "libfast_socks5",
         "libforwarder",
         "libjni",
         "liblog_rust",
         "libnix",
+        "libtokio",
         "libvmm_sys_util",
         "libvsock",
     ],

@@ -23,9 +23,9 @@ use std::result;
 
 use crate::stream::StreamSocket;
 
-// This was picked arbitrarily. crosvm doesn't yet use VIRTIO_NET_F_MTU, so there's no reason to
-// opt for massive 65535 byte frames.
-const MAX_FRAME_SIZE: usize = 8192;
+/// This was picked arbitrarily. crosvm doesn't yet use VIRTIO_NET_F_MTU, so there's no reason to
+/// opt for massive 65535 byte frames.
+pub const MAX_FRAME_SIZE: usize = 8192;
 
 /// Errors that can be encountered by a ForwarderSession.
 #[remain::sorted]

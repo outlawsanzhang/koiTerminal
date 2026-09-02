@@ -79,9 +79,11 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Port to Android 17 version of VmTerminalApp
 - [X] Add support for One UI 8.5 on legacy branch
 - [ ] Build-time signature verification for Secureblue
+- [X] Add support for port forwarding, shutdown, etc.
+- [X]  (stretch) Experimental: Enable forcing the VM to use the host vpn
+    - Supported by disabling network and including a managed socks5 proxy
 - [ ] Fix Secureblue image
     - [ ] Add support for display.
-    - [ ] Add support for ttyd, shutdown, port forwarding, etc.
     - [ ] Add support for file transfer.
 - [ ]  (stretch) Build 6.12 LTS vanilla kernel RPM package for Secureblue?
 - [ ] Implement a super-config system, including support for multiple `vm_config.json` files for different modes (install, update, use, isolated software, airgap...) or just different VMs.
@@ -223,6 +225,7 @@ In this case, you can add ttyd tabs by pressing the "+" sign. <!-- UPDATE -->
 
 # How to build koiTerminal
 Please see [BUILD.md](BUILD.md).
+<!-- UPDATE --><!-- Checklist: main repo version, fast-socks5 version, u-boot version-->
 
 # Misc
 ### License

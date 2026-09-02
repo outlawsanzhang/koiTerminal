@@ -46,6 +46,16 @@ git checkout koiterminal
 cd ../../..
 ```
 
+:gift: NEW: Then, the following changes are needed for a few rust dependencies:
+```
+pushd external/rust/android-crates-io/crates/
+# Add fast-socks5 crate, and sync over (cargo_embargo generated) Android.bp. The commit bae2fc0 was used
+git clone https://github.com/dizda/fast-socks5.git
+ln -s ../../../../../packages/modules/Virtualization/android/forwarder_host/fs5-Android-bp fast-socks5/Android.bp
+# Enable tokio-stream for apex com.android.virt. This should only add one line to the original Android.bp.
+cp ../../../../../packages/modules/Virtualization/android/forwarder_host/ts-Android-bp tokio-stream/Android.bp
+```
+
 Then, build the Terminal app / OS again. This should be a lot quicker than the first time.
 When it completes, the app should be produced at `out/target/product/$DEVICE/apex/com.android.virt/priv-app/VmTerminalApp@*/VmTerminalApp.apk`.
 

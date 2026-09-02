@@ -36,7 +36,7 @@ rustup target add aarch64-unknown-linux-gnu
 ```
 and the following config:
 ```
-# In file "~/.cargo/config":
+# In file "~/.cargo/config.toml":
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
 ```
@@ -55,4 +55,4 @@ ls target/aarch64-unknown-linux-gnu/*/linux_vm_manager
 ```
 which can be used when building VM images*.
 
-(* Note) Alpine probably requires the `aarch64-unknown-linux-musl` target, and is not tested
+(* Note) Alpine probably requires the `aarch64-unknown-linux-musl` target, and that setup is not tested
