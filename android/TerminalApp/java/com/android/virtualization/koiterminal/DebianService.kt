@@ -88,6 +88,7 @@ internal class DebianService(
     }
 
     override fun stop() {
+        portsStateManager.unregisterListener(portsStateListener) // upstream bug?
         ForwarderHost.shutdown()
     }
 
