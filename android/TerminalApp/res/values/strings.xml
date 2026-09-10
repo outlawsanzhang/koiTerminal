@@ -403,6 +403,45 @@
 
 
     <!-- ================================================================= -->
+    <!-- Settings - Network                                                -->
+    <!-- ================================================================= -->
+
+    
+    <!-- Settings menu title for selecting the network connection type [CHAR LIMIT=none] -->
+    <string name="settings_network_title">Network</string>
+    <!-- Title for entering a delegate socks5 proxy port. [CHAR LIMIT=none] -->
+    <string name="settings_delegating_port_dlg_title">External socks5 proxy port</string>
+    <!-- No network. [CHAR LIMIT=none] -->
+    <string name="settings_network_none">No network</string>
+    <!-- No network. [CHAR LIMIT=none] -->
+    <string name="settings_network_none_desc">Port forwarding only</string>
+    <!-- Full network. [CHAR LIMIT=none] -->
+    <string name="settings_network_full">Raw network</string>
+    <!-- Full network. [CHAR LIMIT=none] -->
+    <string name="settings_network_full_desc">Bypasses Android host VPN</string>
+    <!-- Managed socks5. [CHAR LIMIT=none] -->
+    <string name="settings_network_managed_socks5">Route through app</string>
+    <!-- Managed socks5. [CHAR LIMIT=none] -->
+    <string name="settings_network_managed_socks5_desc">Local SOCKS5, shares the app\'s network</string>
+    <!-- Delegate socks5. [CHAR LIMIT=none] -->
+    <string name="settings_network_delegate_socks5">Custom proxy</string>
+    <!-- Delegate socks5. [CHAR LIMIT=none] -->
+    <string name="settings_network_delegate_socks5_desc">Route to a SOCKS5 exposed by another app</string>
+    <!-- Section title for koi-managed socks5 allowed connections. [CHAR LIMIT=none] -->
+    <string name="settings_socks5_connections">Allowed connections</string>
+    <!-- Whether access to ports on the device is allowed for koi-managed socks5. [CHAR LIMIT=none] -->
+    <string name="settings_socks5_loopback_ok">To other apps</string>
+    <!-- Whether access to ports on the device is allowed for koi-managed socks5. [CHAR LIMIT=none] -->
+    <string name="settings_socks5_loopback_ok_desc">Allow connecting to loopback addresses</string>
+    <!-- Whether access to local network is allowed for koi-managed socks5. [CHAR LIMIT=none] -->
+    <string name="settings_socks5_local_ok">To nearby devices</string>
+    <!-- Whether access to local network is allowed for koi-managed socks5. [CHAR LIMIT=none] -->
+    <string name="settings_socks5_local_ok_desc">Allow connecting to local addresses</string>
+    <!-- External socks5 proxy port. [CHAR LIMIT=none] -->
+    <string name="settings_socks5_delegated_port">External SOCKS5 proxy port</string>
+
+
+    <!-- ================================================================= -->
     <!-- Error Screen                                                      -->
     <!-- ================================================================= -->
 

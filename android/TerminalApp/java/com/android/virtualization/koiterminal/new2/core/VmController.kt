@@ -42,6 +42,7 @@ import com.android.virtualization.koiterminal.InstalledImage.Companion.roundUp
 import com.android.virtualization.koiterminal.NoLogger
 import com.android.virtualization.koiterminal.TerminalThreadFactory
 import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
+import com.android.virtualization.koiterminal.new2.ui.main.NetworkConnection
 import com.android.virtualization.koiterminal.new2.util.LoggingMutableStateFlow
 import java.io.IOException
 import java.util.concurrent.Executors
@@ -196,6 +197,14 @@ object VmController {
                 configBuilder.setMemoryBytes(memoryMib.toLong() * 1024 * 1024)
 
                 val customImageConfigBuilder = json.toCustomImageConfigBuilder(context)
+
+                // Network specified in settings, but if VM config denies it, we treat it as denied
+                if (customImageConfigBuilder.build().useNetwork()) {
+                    val network: NetworkConnection = SettingsViewModel.networkConnectionPref(sharedPref)
+                    if (network != NetworkConnection.FULL) {
+                        customImageConfigBuilder.useNetwork(false)
+                    }
+                }
 
                 // Convert rootfs disk into a sparse file for storage ballooning.
                 truncateDiskIfNecessary(image)

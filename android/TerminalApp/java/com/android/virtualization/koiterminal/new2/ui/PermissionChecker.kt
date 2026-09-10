@@ -46,7 +46,6 @@ import kotlinx.coroutines.launch
 val PERMISSIONS =
     arrayOf(
         Manifest.permission.POST_NOTIFICATIONS,
-        Manifest.permission.ACCESS_LOCAL_NETWORK,
         Manifest.permission.RECORD_AUDIO,
     )
 
@@ -119,12 +118,7 @@ fun PermissionChecker(viewModel: MainViewModel, snackbarHostState: SnackbarHostS
                 viewModel.onPermissionGranted()
             } else {
                 viewModel.onPermissionDenied()
-                // TODO(b/492409159): Remove this check if local network is no longer mandatory
-                val hasLocalNetwork =
-                    results[Manifest.permission.ACCESS_LOCAL_NETWORK]
-                        ?: (context.checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) ==
-                            PackageManager.PERMISSION_GRANTED)
-                if (hasLocalNetwork && previousMandatory) {
+                if (previousMandatory) {
                     val deniedPermissions = results.filter { !it.value }.keys.toList()
                     showMissingPermissionsSnackbar(deniedPermissions)
                 }

@@ -15,12 +15,21 @@
  */
 package com.android.virtualization.koiterminal.new2.ui
 
+import android.Manifest.permission
+import android.Manifest.permission_group
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.icu.number.NumberFormatter
 import android.icu.number.NumberRangeFormatter
 import android.icu.number.Precision
 import android.icu.text.MeasureFormat
 import android.icu.util.MeasureUnit
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,17 +44,32 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddToHomeScreen
+import androidx.compose.material.icons.filled.AppBlocking
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.DisplaySettings
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.NearbyError
+import androidx.compose.material.icons.filled.NearbyOff
+import androidx.compose.material.icons.filled.OfflineBolt
+import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SettingsEthernet
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -54,6 +78,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -81,6 +106,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -94,6 +120,7 @@ import com.android.virtualization.koiterminal.new2.core.OpenPort
 import com.android.virtualization.koiterminal.new2.core.VmController
 import com.android.virtualization.koiterminal.new2.ui.main.DisplayResolution
 import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
+import com.android.virtualization.koiterminal.new2.ui.main.NetworkConnection
 import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
 import java.math.RoundingMode
 import java.util.Locale
@@ -104,6 +131,7 @@ import kotlinx.coroutines.launch
 
 enum class SettingsDestination(val title: Int, val icon: ImageVector) {
     PortControl(R.string.settings_port_title, Icons.Default.Security),
+    Network(R.string.settings_network_title, Icons.Default.SettingsEthernet),
     Advanced(R.string.settings_advanced_title, Icons.Default.Tune),
     Recovery(R.string.settings_recovery_title, Icons.Default.Restore),
 }
@@ -122,6 +150,23 @@ enum class KeepAwakeDuration(val minutes: Int, val stringRes: Int) {
     companion object {
         fun fromMinutes(minutes: Int): KeepAwakeDuration {
             return entries.find { it.minutes == minutes } ?: OFF
+        }
+    }
+}
+
+enum class NetworkConnectionOptions(val icon: ImageVector, val titleRes: Int, val descRes: Int) {
+    NONE(Icons.Default.OfflineBolt, R.string.settings_network_none, R.string.settings_network_none_desc),
+    FULL(Icons.Default.Public, R.string.settings_network_full, R.string.settings_network_full_desc),
+    MANAGED_SOCKS5(Icons.Default.VpnKey, R.string.settings_network_managed_socks5, R.string.settings_network_managed_socks5_desc),
+    DELEGATE_SOCKS5(Icons.Default.Directions, R.string.settings_network_delegate_socks5, R.string.settings_network_delegate_socks5_desc);
+
+    fun toSetting(): NetworkConnection {
+        return NetworkConnection.valueOf(name)
+    }
+
+    companion object {
+        fun fromSetting(connection: NetworkConnection): NetworkConnectionOptions {
+            return NetworkConnectionOptions.valueOf(connection.name)
         }
     }
 }
@@ -269,11 +314,301 @@ fun SettingsDetailPane(
         Box(modifier = Modifier.padding(innerPadding)) {
             when (destination) {
                 SettingsDestination.PortControl -> PortControlPage()
+                SettingsDestination.Network -> NetworkPage(onCloseSettings)
                 SettingsDestination.Advanced -> AdvancedPage(onCloseSettings)
                 SettingsDestination.Recovery -> RecoveryPage()
             }
         }
     }
+}
+
+fun checkLocalPermission(activity: Activity): Boolean {
+    return activity.checkSelfPermission(android.Manifest.permission.ACCESS_LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED
+}
+
+fun intentLaunchAppSettings(activity: Activity): Intent {
+    return Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", activity.packageName, null)
+    }
+}
+
+@Composable
+fun NetworkPage(
+    onCloseSettings: () -> Unit,
+    mainViewModel: MainViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel(),
+) {
+    val activity = LocalContext.current as Activity
+    val currentNetwork by settingsViewModel.networkConnection.collectAsStateWithLifecycle()
+    val currentNetworkOption = NetworkConnectionOptions.fromSetting(currentNetwork)
+    val socks5Delegate by settingsViewModel.socks5Delegate.collectAsStateWithLifecycle()
+    var localPermission by remember { mutableStateOf(checkLocalPermission(activity)) }
+    localPermission = checkLocalPermission(activity)
+    val socks5LoopbackOk by settingsViewModel.socks5LoopbackOk.collectAsStateWithLifecycle()
+    var showNetworkSelectionDialog by remember { mutableStateOf(false) }
+    var showDelegatePortDialog by remember { mutableStateOf(false) }
+    var showRebootDialog by remember { mutableStateOf(0) }
+    var delegatePort by remember { mutableStateOf<String>(socks5Delegate.toString()) }
+    var portErrorResId by remember { mutableStateOf<Int?>(null) }
+    val settingsLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            localPermission = checkLocalPermission(activity)
+        }
+    val localPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            localPermission = checkLocalPermission(activity)
+            if (!localPermission) {
+                settingsLauncher.launch(intentLaunchAppSettings(activity))
+            }
+        }
+
+
+    if (showNetworkSelectionDialog) {
+        NetworkSelectionDialog(
+            currentSelection = currentNetworkOption,
+            onDismissRequest = { showNetworkSelectionDialog = false },
+            onConfirm = { option ->
+                settingsViewModel.setNetworkConnection(option.toSetting())
+                showNetworkSelectionDialog = false
+                showRebootDialog = 1
+            },
+        )
+    }
+    if (showDelegatePortDialog) {
+        AlertDialog(
+            onDismissRequest = { showDelegatePortDialog = false },
+            title = { Text(stringResource(R.string.settings_delegating_port_dlg_title)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = delegatePort,
+                        onValueChange = { it ->
+                            delegatePort = it
+                            portErrorResId = null
+                        },
+                        label = { Text(stringResource(R.string.settings_port_dlg_hint_port_number)) },
+                        isError = portErrorResId != null,
+                        supportingText = portErrorResId?.let { { Text(stringResource(it)) } },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val port = delegatePort.toIntOrNull()
+                        if (port == null) {
+                            portErrorResId = R.string.settings_port_dlg_error_invalid_input
+                        } else if (port < 1024 || port > 65535) {
+                            portErrorResId = R.string.settings_port_dlg_error_invalid_range
+                        } else {
+                            showDelegatePortDialog = false
+                            if (socks5Delegate != port) {
+                                settingsViewModel.setSocks5Delegate(port)
+                                showRebootDialog = 1
+                            }
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_port_dlg_btn_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDelegatePortDialog = false }) {
+                    Text(stringResource(R.string.settings_port_dlg_btn_cancel))
+                }
+            },
+        )
+    }
+
+    if (showRebootDialog != 0) {
+        AlertDialog(
+            onDismissRequest = { showRebootDialog = 0 },
+            title = { Text(stringResource(R.string.settings_graphics_dlg_title_restart)) },
+            text = { Text(stringResource(R.string.settings_graphics_dlg_message_restart)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        when (showRebootDialog) {
+                            1 -> {
+                                showRebootDialog = 0
+                                mainViewModel.restartVm()
+                                onCloseSettings()
+                            }
+                            else -> { // force shut down app
+                                showRebootDialog = 0
+                                mainViewModel.stopVm()
+                                onCloseSettings()
+                            }
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_graphics_dlg_btn_restart))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRebootDialog = 0 }) {
+                    Text(stringResource(R.string.settings_graphics_dlg_btn_later))
+                }
+            },
+        )
+    }
+
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            ListItem(
+                headlineContent = {
+                    Text(stringResource(currentNetworkOption.titleRes))
+                },
+                supportingContent = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(currentNetworkOption.descRes))
+                    }
+                },
+                leadingContent = { Icon(imageVector = currentNetworkOption.icon, contentDescription = null) },
+                trailingContent = {
+                    Icon(imageVector = Icons.Default.ExpandMore, contentDescription = null)
+                },
+                modifier = Modifier.clickable { showNetworkSelectionDialog = true },
+            ) 
+        }
+        when (currentNetwork) {
+            NetworkConnection.MANAGED_SOCKS5 -> {
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_socks5_connections)) },
+                    )
+                }
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_socks5_local_ok)) },
+                        supportingContent = { Text(stringResource(R.string.settings_socks5_local_ok_desc)) },
+                        leadingContent = {
+                            Icon(imageVector = Icons.Default.NearbyError, contentDescription = null)
+                        },
+                        trailingContent = {
+                            Switch(checked = localPermission, onCheckedChange = null)
+                        },
+                        modifier = Modifier.toggleable(
+                            value = localPermission,
+                            role = Role.Switch,
+                        ) { ok ->
+                            if (ok) {
+                                // Ask for permission
+                                localPermissionLauncher.launch(android.Manifest.permission.ACCESS_LOCAL_NETWORK)
+                            } else {
+                                // Somehow, this does not fully revoke the permission. Must direct the user to do so
+                                // Are there more permissions in android.Manifest.permission_group.NEARBY_DEVICES? We don't request any.
+                                // activity.revokeSelfPermissionOnKill(android.Manifest.permission.ACCESS_LOCAL_NETWORK)
+                                // showRebootDialog = 2 // force shut down app
+                                settingsLauncher.launch(intentLaunchAppSettings(activity))
+                            }
+                        },
+                    )
+                }
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_socks5_loopback_ok)) },
+                        supportingContent = { Text(stringResource(R.string.settings_socks5_loopback_ok_desc)) },
+                        leadingContent = {
+                            Icon(imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen, contentDescription = null)
+                        },
+                        trailingContent = {
+                            Switch(checked = socks5LoopbackOk, onCheckedChange = null)
+                        },
+                        modifier = Modifier.toggleable(
+                            value = socks5LoopbackOk,
+                            role = Role.Switch,
+                        ) { ok ->
+                            settingsViewModel.setSocks5LoopbackOk(ok)
+                            showRebootDialog = 1
+                        },
+                    )
+                }
+            }
+            NetworkConnection.DELEGATE_SOCKS5 -> {
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_socks5_delegated_port)) },
+                        supportingContent = { Text(socks5Delegate.toString()) },
+                        leadingContent = {
+                            Icon(imageVector = Icons.Default.Pin, contentDescription = null)
+                        },
+                        modifier =
+                            Modifier.clickable {
+                                showDelegatePortDialog = true
+                            },
+                    )
+                }
+            }
+            else -> {}
+        }
+        item {
+            HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+fun NetworkSelectionDialog(
+    currentSelection: NetworkConnectionOptions,
+    onDismissRequest: () -> Unit,
+    onConfirm: (NetworkConnectionOptions) -> Unit,
+) {
+    var selected by remember { mutableStateOf(currentSelection) }
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text(stringResource(R.string.settings_network_title)) },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                NetworkConnectionOptions.entries.forEachIndexed { index, option ->
+                    val isSelected = option == selected
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .height(64.dp)
+                            .selectable(
+                                selected = isSelected,
+                                onClick = { selected = option },
+                                role = Role.RadioButton,
+                            )
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = isSelected, onClick = null)
+                        // Icon(option.icon, contentDescription = null) // too ugly and cramped
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            Text(
+                                text = stringResource(option.titleRes),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                text = stringResource(option.descRes),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (selected != currentSelection) {
+                    onConfirm(selected)
+                } else {
+                    onDismissRequest()
+                }
+            }) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable
