@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::error::Error as stdError;
 use std::fmt;
 use std::io;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::result;
 use std::sync::{Arc, LazyLock, Mutex};
@@ -30,12 +30,12 @@ use std::sync::{Arc, LazyLock, Mutex};
 use android_logger::Config;
 use fast_socks5::{
     server::{DnsResolveHelper as _, ErrorContext, Socks5ServerProtocol, SocksServerError, states}, // , run_udp_proxy
-    util::{stream::tcp_connect_with_timeout, target_addr::TargetAddr},
+    util::{stream::{ConnectError, tcp_connect_with_timeout}, target_addr::TargetAddr},
     ReplyError, Result as SocksResult, Socks5Command, // , SocksError
 };
 use forwarder::forwarder::ForwarderSession;
 use forwarder::stream::{AsyncBorrowedFdStream, AsyncForwarderSession, StreamSocket};
-use jni::objects::{JClass, JIntArray, JObject, JValue};
+use jni::objects::{JClass, JIntArray, JObject, JValue, JValueOwned};
 use jni::sys::jint;
 use jni::JNIEnv;
 use log::{debug, error, info, warn, LevelFilter};
@@ -71,6 +71,7 @@ static REVDISC_QUEUE: LazyLock<Arc<Mutex<VecDeque<RawFd>>>> =
 #[remain::sorted]
 #[derive(Debug)]
 enum Error {
+    JNI(jni::errors::Error),
     NoListenerForPort(u16),
     NoRcServiceForPort(i32),
     NoSessionForTag(SessionTag),
@@ -95,6 +96,10 @@ impl fmt::Display for Error {
 
         #[remain::sorted]
         match self {
+            JNI(e) => {
+                let e_src = e.source();
+                write!(f, "JNI error: {e:#?} ({e}), {e_src:#?}")
+            },
             NoListenerForPort(port) => write!(f, "could not find listener for port: {port}"),
             NoRcServiceForPort(port) => write!(f, "could not find reverse-connected service for vsock port: {port:x}"),
             NoSessionForTag(tag) => write!(f, "could not find session for tag: {tag:x}"),
@@ -160,7 +165,7 @@ trait ReverseConnectedService {
 
 struct RcSocks5Proxy {
     vsock_port: i32,
-    request_timeout: std::time::Duration, // default = 10
+    setup: Arc<Socks5Setup>,
     rt: Arc<Runtime>,
 }
 
@@ -181,11 +186,59 @@ macro_rules! try_notify {
     };
 }
 
+/// An attempt to find out what are private addresses.
+/// This differs from the ACCESS_LOCAL_NETWORK permission, so should be handled by Android instead.
+#[allow(dead_code)]
+fn is_global_ip(ip: &IpAddr, allow_protocols: bool) -> bool {
+    // See Ipv4Addr::is_global() and Ipv6Addr::is_global()
+    // allow_protocols: whether uncommon protocol-specific addresses are allowed; specify false to be safer
+    if ip.is_unspecified() || ip.is_loopback() {
+        return false;
+    }
+    match ip {
+        IpAddr::V4(ip) => {
+            if ip.is_private() || ip.is_link_local() || ip.is_documentation() || ip.is_broadcast() {
+                return false;
+            }
+            match ip.octets() {
+                [0, _, _, _] => false, // "this network"
+                [100, 64..=127, _, _] => false, // is_shared
+                [192, 0, 0, d] => (d == 9 || d == 10) && allow_protocols, // reserved, except .9 and .10
+                [198, 18..=19, _, _] => false, // is_benchmarking
+                [240..=255, _, _, _] => false, // is_reserved
+                _ => true,
+            }
+        },
+        IpAddr::V6(ip) => {
+            if ip.is_unique_local() || ip.is_unicast_link_local() {
+                return false;
+            }
+            match ip.segments() {
+                [0, 0, 0, 0, 0, 0xffff, ..] => false, // IPv4-mapped Address
+                [0x64, 0xff9b, 1, ..] => false, // IPv4-IPv6 Translat.
+                [0x100, 0, 0, 0, ..] => false, // Discard-Only Address Block
+                // It seems that VPN leakage is attributed to multicast, so anycast is fine for now.
+                // It does sound like anycast should be routed to the other side of the VPN tunnel.
+                // I sure hope Android does not decide to route any of these outside the VPN.
+                [0x2001, 1, 0, 0, 0, 0, 0, 1..=2] => allow_protocols, // PCP Anycast, TURN Anycast
+                [0x2001, 3, ..] => allow_protocols, // AMT public relay anycast
+                [0x2001, 4, 0x112, ..] => allow_protocols, // AS112-v6 (DNS sinks)
+                [0x2001, 0x20..=0x3f, ..] => allow_protocols, // ORCHIDv2; Drone Remote ID Protocol Entity Tags
+                [0x2001, ..] => false, // IETF Protocol Assignments, all others, including is_benchmarking and part of is_documentation
+                [0x2002, ..] => false, // 6to4
+                [0x3fff, 0..=0x0fff, ..] => false, // is_documentation
+                [0x5f00, ..] => false, // Segment Routing (SRv6) SIDs
+                _ => true,
+            }
+        },
+    }
+}
+
 impl RcSocks5Proxy {
-    fn new(vsock_port: i32, request_timeout_ms: u32, rt: Arc<Runtime>) -> Self {
+    fn new(vsock_port: i32, setup: Arc<Socks5Setup>, rt: Arc<Runtime>) -> Self {
         Self {
             vsock_port,
-            request_timeout: std::time::Duration::from_millis(request_timeout_ms.into()),
+            setup,
             rt,
         }
     }
@@ -193,7 +246,7 @@ impl RcSocks5Proxy {
     async fn run_tcp_proxy_blocking<'a>(
         proto: Socks5ServerProtocol<AsyncBorrowedFdStream<'a>, states::CommandRead>,
         addr: &TargetAddr,
-        request_timeout: std::time::Duration,
+        setup: Arc<Socks5Setup>,
         nodelay: bool,
     ) -> result::Result<(), SocksServerError> {
         let addr = try_notify!(
@@ -201,10 +254,15 @@ impl RcSocks5Proxy {
             addr.to_socket_addrs()
                 .err_when("converting to socket addr")
                 .and_then(|mut addrs| addrs.next().ok_or(SocksServerError::Bug("no socket addrs")))
+                .and_then(|addr|
+                    // Check if address is allowed
+                    if setup.allows_address(&addr.ip()) { Ok(addr) }
+                    else { Err(SocksServerError::ConnectError(ConnectError::ConnectionReset(io::Error::from_raw_os_error(103)))) } // libc::ECONNABORTED = 103, libc::ECONNRESET = 104
+                )
         );
 
         // TCP connect with timeout, to avoid memory leak for connection that takes forever
-        let outbound = match tcp_connect_with_timeout(addr, request_timeout).await {
+        let outbound = match tcp_connect_with_timeout(addr, setup.timeout).await {
             Ok(stream) => stream,
             Err(err) => {
                 proto.reply_error(&err.to_reply_error()).await?;
@@ -244,7 +302,7 @@ impl RcSocks5Proxy {
         Ok(())
     }
 
-    async fn run_new_connection_blocking(fd: RawFd, request_timeout: std::time::Duration) -> SocksResult<()> {
+    async fn run_new_connection_blocking(fd: RawFd, setup: Arc<Socks5Setup>) -> SocksResult<()> {
         // Safety: only other operation is closing the vsock, which happens outside the scope of `stream`
         let stream = unsafe { AsyncBorrowedFdStream::new(&fd) }?;
         // Authentication not needed since there is no exposed port. All connection via vsock as file descriptors
@@ -254,7 +312,7 @@ impl RcSocks5Proxy {
             .resolve_dns().await.inspect_err(|e| error!("fast-socks5 new connection dns error: {e}"))?;
         match cmd {
             Socks5Command::TCPConnect => {
-                Self::run_tcp_proxy_blocking(proto, &target_addr, request_timeout, true).await.inspect_err(|e| error!("fast-socks5 connection running error: {e}"))?;
+                Self::run_tcp_proxy_blocking(proto, &target_addr, setup, true).await.inspect_err(|e| error!("fast-socks5 connection running error: {e}"))?;
             }
             Socks5Command::UDPAssociate => {
                 // // TODO: UDP requires a jni_cb member function like
@@ -265,6 +323,9 @@ impl RcSocks5Proxy {
                 // // and host will need to pass that somehow to a very custom version of run_udp_proxy.
                 // // Will implement later.
                 // run_udp_proxy_vsock_version(proto, &target_addr, None, "127.0.0.1", None).await?;
+                if setup.udp {
+                    error!("UDP enabled, but not implemented");
+                }
                 proto.reply_error(&ReplyError::CommandNotSupported).await.inspect_err(|e| error!("fast-socks5 new connection reply_error error: {e}"))?;
                 return Err(ReplyError::CommandNotSupported.into());
             }
@@ -283,13 +344,22 @@ impl ReverseConnectedService for RcSocks5Proxy {
     }
 
     fn on_new_connection(&mut self, fd: RawFd) -> Result<Option<ForwarderSession>> {
-        let request_timeout = self.request_timeout;
+        let setup = self.setup.clone();
+        // Delegated proxy:
+        if setup.delegated != 0 {
+            let tcp_stream = TcpStream::connect((Ipv4Addr::LOCALHOST, setup.delegated)).map_err(Error::TcpAccept)?;
+            // Safety: fd only used in rust, and closing in jni is called when done, and specified not handling closing
+            let mut vsock_stream = unsafe { StreamSocket::from_raw_fd(fd) };
+            vsock_stream.handles_closing = false;
+            return Ok(Some(ForwarderSession::new(tcp_stream.into(), vsock_stream)));
+        }
+        // Managed proxy:
         // AsyncBorrowedFdStream pretends to be an async task but is actually blocking,
         // and cannot be implemented as non-blocking due to Android restrictions on
         // file descriptor set non-blocking and query buffer emptiness
         self.rt.spawn_blocking(move || {
             let result = tokio::runtime::Handle::current().block_on(async move {
-                Self::run_new_connection_blocking(fd, request_timeout).await
+                Self::run_new_connection_blocking(fd, setup).await
             });
             let mut revdisc_queue = REVDISC_QUEUE.lock().unwrap();
             revdisc_queue.push_back(fd);
@@ -328,12 +398,13 @@ impl<'a> ForwarderSessions<'a> {
                     .expect("Failed to create tokio runtime")
             ),
         };
-        let setup = ForwarderHostSetup::from_java(&mut session.jni_env, setup).expect("Cannot parse ForwarderHostSetup");
+        let setup = ForwarderHostSetup::from_java(&mut session.jni_env, setup)
+            .map_err(|e| { error!("Cannot parse ForwarderHostSetup: {e}"); Error::JNI(e) })?;
         debug!("ForwarderSessions: received ForwarderHostSetup from Kotlin = {setup:?}");
         if setup.rcServices.contains(&setup.REVCONN_SOCKS5_PROXY) {
             info!("ForwarderSessions: setting up reverse-connected socks5 proxy at vsock port {}", setup.SOCKS5_PORT);
             session.include_reverse_connected_service(
-                Box::new(RcSocks5Proxy::new(setup.SOCKS5_PORT, 10000, session.rt.clone()))
+                Box::new(RcSocks5Proxy::new(setup.SOCKS5_PORT, Arc::new(setup.socks5), session.rt.clone()))
             );
         }
         Ok(session)
@@ -490,7 +561,10 @@ impl<'a> ForwarderSessions<'a> {
 
     fn forward_from_local(&mut self, poll_ctx: &PollContext<Token>, tag: SessionTag) -> Result<()> {
         let session = self.tcp4_forwarders.get_mut(&tag).ok_or(Error::NoSessionForTag(tag))?;
-        let shutdown = session.forward_from_local().unwrap_or(true);
+        let shutdown = session.forward_from_local(true).unwrap_or_else(|e| {
+            info!("Forwarder unexpectedly shut down when forwarding local data on fd {tag}: {e}");
+            true
+        });
         if shutdown {
             poll_ctx.delete(session.local_stream()).map_err(Error::PollContextDelete)?;
             if session.is_shut_down() {
@@ -509,7 +583,10 @@ impl<'a> ForwarderSessions<'a> {
         tag: SessionTag,
     ) -> Result<()> {
         let session = self.tcp4_forwarders.get_mut(&tag).ok_or(Error::NoSessionForTag(tag))?;
-        let shutdown = session.forward_from_remote().unwrap_or(true);
+        let shutdown = session.forward_from_remote(true).unwrap_or_else(|e| {
+            info!("Forwarder unexpectedly shut down when forwarding remote data on fd {tag}: {e}");
+            true
+        });
         if shutdown {
             poll_ctx.delete(session.remote_stream()).map_err(Error::PollContextDelete)?;
             if session.is_shut_down() {
@@ -676,16 +753,51 @@ fn create_forwarder_session(
 
 #[allow(non_snake_case)]
 #[derive(Debug)]
+struct Socks5Setup {
+    delegated: u16, // =0 for managed, >0 for 3rd-party port
+    loopback: bool,
+    udp: bool,
+    multicast: bool,
+    timeout: std::time::Duration,
+}
+
+impl Socks5Setup {
+    pub fn new(delegated: u16, loopback: bool, udp: bool, multicast: bool, timeout_ms: u64) -> Self {
+        Socks5Setup { delegated, loopback, udp, multicast, timeout: std::time::Duration::from_millis(timeout_ms) }
+    }
+
+    pub fn allows_address(&self, addr: &IpAddr) -> bool {
+        if addr.is_loopback() && !self.loopback {
+            return false;
+        }
+        if addr.is_multicast() && !self.multicast {
+            return false;
+        }
+        if let IpAddr::V4(addr) = addr {
+            if addr.is_broadcast() && !self.multicast {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug)]
 struct ForwarderHostSetup {
     rcServices: Vec<i32>,
+    socks5: Socks5Setup,
     REVCONN_SOCKS5_PROXY: i32,
     SOCKS5_PORT: i32,
 }
 
 impl ForwarderHostSetup {
+    fn get_field<'a, 'b>(jni_env: &mut JNIEnv<'a>, obj: &JObject<'b>, field: &str, ty: &str) -> result::Result<JValueOwned<'a>, jni::errors::Error> {
+        jni_env.get_field(obj, field, ty).inspect_err(|e| error!("failed to get field {field}: {e}"))
+    }
+
     fn get_field_int_array(jni_env: &mut JNIEnv, obj: &JObject, field: &str) -> result::Result<Vec<i32>, jni::errors::Error> {
-        let array = jni_env
-            .get_field(obj, field, "[I").inspect_err(|e| error!("failed to get field {field}: {e}"))?
+        let array = Self::get_field(jni_env, obj, field, "[I")?
             .l().inspect_err(|e| error!("failed to cast JValueOwned -> JObject: {e}"))?;
         let int_array = JIntArray::from(array);
         let len = jni_env
@@ -699,13 +811,24 @@ impl ForwarderHostSetup {
     }
 
     fn get_field_int(jni_env: &mut JNIEnv, obj: &JObject, field: &str) -> result::Result<i32, jni::errors::Error> {
-        jni_env.get_field(obj, field, "I").inspect_err(|e| error!("failed to get field {field}: {e}"))?
-            .i().inspect_err(|e| error!("failed to cast field {field} as int: {e}"))
+        Self::get_field(jni_env, obj, field, "I")?.i().inspect_err(|e| error!("failed to cast field {field} as int: {e}"))
+    }
+
+    fn get_field_bool(jni_env: &mut JNIEnv, obj: &JObject, field: &str) -> result::Result<bool, jni::errors::Error> {
+        Self::get_field(jni_env, obj, field, "Z")?.z().inspect_err(|e| error!("failed to cast field {field} as int: {e}"))
     }
 
     fn from_java(jni_env: &mut JNIEnv, setup: JObject) -> result::Result<ForwarderHostSetup, jni::errors::Error> {
+        let socks5 = Self::get_field(jni_env, &setup, "socks5", "Lcom/android/virtualization/koiterminal/Socks5Setup;")?.l().inspect_err(|e| error!("failed to cast field socks5 as object: {e}"))?;
         Ok(ForwarderHostSetup {
             rcServices: Self::get_field_int_array(jni_env, &setup, "rcServices")?,
+            socks5: Socks5Setup::new(
+                Self::get_field_int(jni_env, &socks5, "delegated")?.try_into().unwrap_or(0),
+                Self::get_field_bool(jni_env, &socks5, "loopback")?,
+                Self::get_field_bool(jni_env, &socks5, "udp")?,
+                Self::get_field_bool(jni_env, &socks5, "multicast")?,
+                Self::get_field_int(jni_env, &socks5, "timeout_ms")?.try_into().unwrap_or(0),
+            ),
             REVCONN_SOCKS5_PROXY: Self::get_field_int(jni_env, &setup, "REVCONN_SOCKS5_PROXY")?,
             SOCKS5_PORT: Self::get_field_int(jni_env, &setup, "SOCKS5_PORT")?,
         })

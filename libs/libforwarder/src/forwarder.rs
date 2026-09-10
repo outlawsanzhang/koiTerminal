@@ -83,15 +83,19 @@ impl ForwarderSession {
     /// Forwards traffic from the local socket to the remote socket.
     /// Returns true if the local socket has reached EOF and the
     /// remote socket has been shut down for further writes.
-    pub fn forward_from_local(&mut self) -> Result<bool> {
-        forward(&mut self.local, &mut self.remote)
+    pub fn forward_from_local(&mut self, auto_shutdown: bool) -> Result<bool> {
+        forward(&mut self.local, &mut self.remote).inspect_err(|_| {
+            if auto_shutdown { self.remote.shut_down_write().inspect_err(|_| self.remote.mark_shut_down()).ok(); }
+        })
     }
 
     /// Forwards traffic from the remote socket to the local socket.
     /// Returns true if the remote socket has reached EOF and the
     /// local socket has been shut down for further writes.
-    pub fn forward_from_remote(&mut self) -> Result<bool> {
-        forward(&mut self.remote, &mut self.local)
+    pub fn forward_from_remote(&mut self, auto_shutdown: bool) -> Result<bool> {
+        forward(&mut self.remote, &mut self.local).inspect_err(|_| {
+            if auto_shutdown { self.local.shut_down_write().inspect_err(|_| self.local.mark_shut_down()).ok(); }
+        })
     }
 
     /// Returns a reference to the local stream socket.
@@ -152,7 +156,7 @@ mod tests {
         paris.write_all(salutation).unwrap();
 
         // Expect forwarding from the remote end not to have reached EOF.
-        assert!(!forwarder.forward_from_remote().unwrap());
+        assert!(!forwarder.forward_from_remote(false).unwrap());
         let mut greeting = [0u8; 8];
         let count = london.read(&mut greeting).unwrap();
         assert_eq!(salutation.len(), count);
@@ -161,7 +165,7 @@ mod tests {
         // Shut the remote socket down. The forwarder should detect this and perform a shutdown,
         // which will manifest as an EOF when reading.
         paris.shutdown(Shutdown::Write).unwrap();
-        assert!(forwarder.forward_from_remote().unwrap());
+        assert!(forwarder.forward_from_remote(false).unwrap());
         assert_eq!(london.read(&mut greeting).unwrap(), 0);
 
         // The forwarder should now be considered shut down.

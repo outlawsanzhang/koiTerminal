@@ -98,6 +98,11 @@ impl StreamSocket {
         Ok(())
     }
 
+    /// Force mark shut down in case of permission issues
+    pub fn mark_shut_down(&mut self) {
+        self.shut_down = true;
+    }
+
     /// Returns true if the socket has been shut down for writes, false otherwise.
     pub fn is_shut_down(&self) -> bool {
         self.shut_down
@@ -447,11 +452,10 @@ impl AsyncForwarderSession {
     /// Run forwarding with tokio::task::spawn_blocking
     pub async fn run(me: Self) -> io::Result<()> {
         let (local, remote, port) = (me.local, me.remote, me.port);
+        info!("Forwarding session on port {port} started");
         let fw = task::spawn_blocking(move || AsyncForwarderSession::run_oneway(port, local, remote, FwdDirection::Fwd));
-        let (local, remote, port) = (me.local, me.remote, me.port);
         let bw = task::spawn_blocking(move || AsyncForwarderSession::run_oneway(port, remote, local, FwdDirection::Bwd));
         let (fw, bw) = (fw.await, bw.await);
-        let port = me.port;
         match fw {
             Err(ref e) => { error!("Forwarding session (fwd) on port {} aborted: {e}", port); },
             Ok(Err(ref e)) => { error!("Forwarding session (fwd) on port {} failed: {e}", port); },
@@ -464,6 +468,7 @@ impl AsyncForwarderSession {
         }
         fw??;
         bw??;
+        info!("Forwarding session on port {port} ended successfully");
         Ok(())
     }
 }

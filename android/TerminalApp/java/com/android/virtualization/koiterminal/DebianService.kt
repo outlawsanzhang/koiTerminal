@@ -28,6 +28,7 @@ import com.android.virtualization.debian.aidl.IVmActivePortListener
 import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallbackImpl
 import com.android.virtualization.koiterminal.ForwarderHostSetup
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
+import com.android.virtualization.koiterminal.Socks5Setup
 import com.android.virtualization.terminal.proto.ActivePort
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,10 +56,17 @@ internal class DebianService(
         portsStateManager = PortsStateManager.getInstance(context)
         portsStateManager.registerListener(portsStateListener)
         updateListeningPorts()
+        val socks5 = Socks5Setup(
+            delegated = 0,
+            loopback = true,
+            udp = false,
+            multicast = false,
+            timeout_ms = 10000,
+        )
 
         scope.launch(Dispatchers.IO) {
             try {
-                val setup = ForwarderHostSetup(koiService.getRcServicesAndSetupGuest())
+                val setup = ForwarderHostSetup(koiService.getRcServicesAndSetupGuest(true), socks5)
                 ForwarderHost.run(vm.cid, setup, ForwarderHostCallback(service, vm))
             } catch (e: Exception) {
                 Log.d(TAG, "Exception from JNI", e)
@@ -144,12 +152,16 @@ internal class KoiService(
         }
     }
 
-    fun getRcServicesAndSetupGuest(): IntArray {
+    fun getRcServicesAndSetupGuest(enableSocks5: Boolean): IntArray {
         return if (service == null) {
             intArrayOf()
         } else {
-            service.openReverseConnectedPort(ForwarderHost.defaults.SOCKS5_PORT)
-            intArrayOf(ForwarderHost.defaults.REVCONN_SOCKS5_PROXY)
+            val services = mutableListOf<Int>()
+            if (enableSocks5) {
+                service.openReverseConnectedPort(ForwarderHost.defaults.SOCKS5_PORT)
+                services.add(ForwarderHost.defaults.REVCONN_SOCKS5_PROXY)
+            }
+            services.toIntArray()
         }
     }
 

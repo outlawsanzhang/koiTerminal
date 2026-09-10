@@ -75,7 +75,7 @@ fn run_forwarder(local_stream: StreamSocket, remote_stream: StreamSocket) -> Res
         for event in events.iter_readable() {
             match event.token() {
                 Token::LocalStreamReadable => {
-                    let shutdown = forwarder.forward_from_local().map_err(Error::Forward)?;
+                    let shutdown = forwarder.forward_from_local(false).map_err(Error::Forward)?;
                     if shutdown {
                         poll_ctx
                             .delete(forwarder.local_stream())
@@ -83,7 +83,7 @@ fn run_forwarder(local_stream: StreamSocket, remote_stream: StreamSocket) -> Res
                     }
                 }
                 Token::RemoteStreamReadable => {
-                    let shutdown = forwarder.forward_from_remote().map_err(Error::Forward)?;
+                    let shutdown = forwarder.forward_from_remote(false).map_err(Error::Forward)?;
                     if shutdown {
                         poll_ctx
                             .delete(forwarder.remote_stream())

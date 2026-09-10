@@ -20,8 +20,18 @@ import android.system.virtualmachine.VirtualMachine
 import android.util.Log
 import com.android.virtualization.debian.aidl.IkoiService
 
+data class Socks5Setup(
+    val delegated: Int = 0, // =0 for managed, >0 for 3rd-party port
+    val loopback: Boolean = false,
+    val private: Boolean = false,
+    val udp: Boolean = false,
+    val multicast: Boolean = false,
+    val timeout_ms: Int = 10000,
+)
+
 data class ForwarderHostSetup(
     val rcServices: IntArray = intArrayOf(),
+    val socks5: Socks5Setup = Socks5Setup(),
 ) {
     val REVCONN_SOCKS5_PROXY = 0 // There could potentially be more to come, such as an NFS
     val SOCKS5_PORT = IkoiService.SOCKS5_PORT.toInt()
