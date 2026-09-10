@@ -35,7 +35,10 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - Provides images for other distros (Secureblue, NixOS, Alpine)
 - Exposes VM files (configs, storage, etc.) to enable modifying VM configurations
 - Does not force you to give the VM access to all files
-- Supports airgapping the VM (deny Network permission) in GrapheneOS
+- Supports versatile control of the networking of the VM
+    - Supports airgapping the app and VM (deny Network permission) in GrapheneOS
+    - Supports sharing the host's VPN to the VM, while denying it raw network access
+    - Supports routing the VM's network through an external SOCKS5 proxy, such as the one provided by Orbot's Power User Mode.
 - No rooting necessary, requiring only a one-time permission grant using ADB.
 - Can connect to the VM using the serial console, which enables:
     - Booting from (almost) fresh OS installs
@@ -54,9 +57,6 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - Known sharp edges: <!-- UPDATE -->
     - Just crashes when files referenced in `vm_config.json` are not found, without indicating which.
     - Some images have issues, such as Alpine having network issues, and Secureblue not shutting down properly. See [IMAGES.md](IMAGES.md) for details.
-
- - There is a decent chance that this will be abandonware, especially if a major part of this is upstreamed to GrapheneOS. Again, AS-IS.
- - Known sharp edges: <!-- UPDATE -->
 
 ## Progress and plans
 Goals are mainly targeted at things that neither Google nor GrapheneOS is inclined to do in the near future.
@@ -81,7 +81,8 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [ ] Build-time signature verification for Secureblue
 - [X] Add support for port forwarding, shutdown, etc.
 - [X]  (stretch) Experimental: Enable forcing the VM to use the host vpn
-    - Supported by disabling network and including a managed socks5 proxy
+    - Supported by disabling network and including a managed SOCKS5 proxy
+    - [X] Provide option to control network, SOCKS5, loopback, local network, etc.
 - [ ] Fix Secureblue image
     - [ ] Add support for display.
     - [ ] Add support for file transfer.

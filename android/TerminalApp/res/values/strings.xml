@@ -427,6 +427,8 @@
     <string name="settings_network_delegate_socks5">Custom proxy</string>
     <!-- Delegate socks5. [CHAR LIMIT=none] -->
     <string name="settings_network_delegate_socks5_desc">Route to a SOCKS5 exposed by another app</string>
+    <!-- Open link to limitation documentation. [CHAR LIMIT=none] -->
+    <string name="settings_network_open_limitations">See limitations</string>
     <!-- Section title for koi-managed socks5 allowed connections. [CHAR LIMIT=none] -->
     <string name="settings_socks5_connections">Allowed connections</string>
     <!-- Whether access to ports on the device is allowed for koi-managed socks5. [CHAR LIMIT=none] -->

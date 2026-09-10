@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.NearbyError
 import androidx.compose.material.icons.filled.NearbyOff
 import androidx.compose.material.icons.filled.OfflineBolt
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Public
@@ -68,6 +69,7 @@ import androidx.compose.material.icons.filled.SettingsEthernet
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -129,6 +131,8 @@ import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+
+val NETWORK_LIMITATION_LINK_URL = "https://github.com/outlawsanzhang/koiTerminal/blob/koiterminal/FAQ.md#network-settings-limitations"
 
 enum class SettingsDestination(val title: Int, val icon: ImageVector) {
     PortControl(R.string.settings_port_title, Icons.Default.Security),
