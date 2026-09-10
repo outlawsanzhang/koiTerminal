@@ -119,7 +119,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showIfError = MutableStateFlow(false)
     val showIfError: StateFlow<Boolean> = _showIfError.asStateFlow()
 
-    private val _hasMandatoryPermissions = MutableStateFlow(false)
+    private val _hasMandatoryPermissions = MutableStateFlow(true)
     val hasMandatoryPermissions: StateFlow<Boolean> = _hasMandatoryPermissions.asStateFlow()
 
     private val _permissionRequired = MutableStateFlow(false)

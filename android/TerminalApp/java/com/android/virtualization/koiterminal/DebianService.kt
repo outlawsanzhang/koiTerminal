@@ -21,6 +21,7 @@ import android.system.virtualizationcommon.IGuestAgent
 import android.system.virtualmachine.VirtualMachine
 import android.util.Log
 import androidx.annotation.Keep
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.virtualization.debian.aidl.IDebianService
 import com.android.virtualization.debian.aidl.IkoiService
 import com.android.virtualization.debian.aidl.IkoiHostCallback
@@ -29,6 +30,8 @@ import com.android.virtualization.koiterminal.ForwarderHost.ForwardingCallbackIm
 import com.android.virtualization.koiterminal.ForwarderHostSetup
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import com.android.virtualization.koiterminal.Socks5Setup
+import com.android.virtualization.koiterminal.new2.ui.main.NetworkConnection
+import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
 import com.android.virtualization.terminal.proto.ActivePort
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,9 +59,16 @@ internal class DebianService(
         portsStateManager = PortsStateManager.getInstance(context)
         portsStateManager.registerListener(portsStateListener)
         updateListeningPorts()
+        val sharedPref = context.getSharedPreferences(SettingsViewModel.PREFS_NAME, Context.MODE_PRIVATE)
+        val currentNetwork = SettingsViewModel.networkConnectionPref(sharedPref)
+        val socks5Delegate = SettingsViewModel.socks5DelegatePref(sharedPref)
+        val socks5LoopbackOk = SettingsViewModel.socks5LoopbackOkPref(sharedPref)
+        val isDelegate = currentNetwork == NetworkConnection.DELEGATE_SOCKS5
+        val isManaged = currentNetwork == NetworkConnection.MANAGED_SOCKS5
+        val enableSocks5 = isDelegate || isManaged
         val socks5 = Socks5Setup(
-            delegated = 0,
-            loopback = true,
+            delegated = if (isDelegate) socks5Delegate else 0,
+            loopback = socks5LoopbackOk,
             udp = false,
             multicast = false,
             timeout_ms = 10000,
@@ -66,7 +76,7 @@ internal class DebianService(
 
         scope.launch(Dispatchers.IO) {
             try {
-                val setup = ForwarderHostSetup(koiService.getRcServicesAndSetupGuest(true), socks5)
+                val setup = ForwarderHostSetup(koiService.getRcServicesAndSetupGuest(enableSocks5), socks5)
                 ForwarderHost.run(vm.cid, setup, ForwarderHostCallback(service, vm))
             } catch (e: Exception) {
                 Log.d(TAG, "Exception from JNI", e)
