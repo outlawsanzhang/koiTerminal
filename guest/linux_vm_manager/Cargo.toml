@@ -10,6 +10,7 @@ rsbinder = { version = "0.10", features = ["tokio", "async", "rpc-vsock", "andro
 env_logger = "0.11.5"
 forwarder_guest_launcher = { path = "../forwarder_guest_launcher" }
 forwarder = { path = "../../libs/libforwarder" }
+libc = "0.2.159"
 log = "0.4.22"
 shutdown_runner = { path = "../shutdown_runner" }
 tokio = { version = "1.40.0", features = ["rt-multi-thread"] }

@@ -35,6 +35,11 @@ impl GuestAgent {
 
 impl IGuestAgent for GuestAgent {
     fn shutdownAsync(&self) -> BinderResult<()> {
+        if let Ok(true) = std::fs::exists("/tmp/linux_vm_manager/shutdown.pipe") {
+            if let Ok(()) = std::fs::write("/tmp/linux_vm_manager/shutdown.pipe", "1\n") {
+                return Ok(());
+            }
+        }
         shutdown_runner::power_off().map_err(|e| {
             error!("Error in power_off(), {e:?}");
             Status::new_service_specific_error(-1, None)

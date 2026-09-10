@@ -18,7 +18,7 @@ use crate::aidl;
 use {
     aidl::com::android::virtualization::debian::aidl::{
         IDebianService::{BnDebianService, IDebianService, VSOCK_PORT},
-        IkoiService::{BnIkoiService, IkoiService, VSOCK_PORT as KOI_VSOCK_PORT},
+        IkoiService::{BnIkoiService, IkoiService, VSOCK_PORT as KOI_VSOCK_PORT, SOCKS5_PORT as KOI_SOCKS5_PORT},
         IkoiHostCallback::{IkoiHostCallback},
         IVmActivePortListener::ActivePort::ActivePort,
         IVmActivePortListener::IVmActivePortListener,
@@ -55,7 +55,7 @@ impl DebianService {
         let binder = BnDebianService::new_binder_with_features(service, BinderFeatures::default());
 
         let vsock_port: u32 = VSOCK_PORT.try_into().unwrap();
-        let socket = "/tmp/IDS.socket";
+        let socket = "/tmp/linux_vm_manager/IDS.socket";
         std::fs::remove_file(socket).ok();
         info!("Setting up debian service rpc server at {socket}");
         let server = RpcServer::setup_unix_server(socket)
@@ -116,18 +116,20 @@ impl IDebianService for DebianService {
             };
             let ret =
                 force_send(forwarder_guest_launcher::monitor_active_ports(async move |ports| {
-                    let ports: Vec<ActivePort> = ports
+                    let ports_filtered: Vec<ActivePort> = ports
                         .iter()
-                        .filter(|(x, _)| !managed_ports.contains(*x))
+                        .filter(|(port, comm)|
+                            !managed_ports.contains(*port) && *comm != "linux_vm_manage" // is truncated to 16-1=15
+                        )
                         .map(|(port, comm)| ActivePort {
                             port: *port as i32,
                             comm: comm.to_string(),
                         })
                         .collect();
 
-                    info!("Updated active ports: {ports:?}");
+                    info!("Updated active ports: {ports:?} -> {ports_filtered:?}");
                     listener
-                        .reportActivePorts(&ports)
+                        .reportActivePorts(&ports_filtered)
                         .map_err(|e| anyhow!("Error in reportActivePorts(), {e:?}"))
                 }))
                 .await;
@@ -291,7 +293,7 @@ impl KoiService {
         let binder = BnIkoiService::new_binder(service);
 
         let vsock_port: u32 = KOI_VSOCK_PORT.try_into().unwrap();
-        let socket = "/tmp/IkS.socket";
+        let socket = "/tmp/linux_vm_manager/IkS.socket";
         std::fs::remove_file(socket).ok();
         info!("Setting up koi service rpc server at {socket}");
         let server = RpcServer::setup_unix_server(socket)
@@ -386,7 +388,9 @@ impl KoiService {
         if let BTreeMapEntry::Vacant(o) = registered_ports.entry(vsock_port) {
             if !managed_ports.contains(&vsock_port) {
                 managed_ports.insert(vsock_port);
-                o.insert(self.rt.spawn(Self::run_reverse_connection_listener(vsock_port, callback)));
+                o.insert(self.rt.spawn_blocking(move || tokio::runtime::Handle::current().block_on(
+                    Self::run_reverse_connection_listener(vsock_port, callback)
+                )));
                 return Ok(())
             }
         }
@@ -408,6 +412,11 @@ impl KoiService {
                 Err(Status::new_service_specific_error(-1, None))
             },
         }
+    }
+
+    fn set_socks5_trigger() {
+        std::fs::File::create("/run/linux_vm_manager/socks5.trigger")
+            .map_err(|e| error!("Failed to create socks5.trigger: {e:?}")).ok();
     }
 }
 
@@ -432,6 +441,9 @@ impl IkoiService for KoiService {
     fn openReverseConnectedPort(&self, vsock_port: i32) -> BinderResult<()> {
         #[allow(overflowing_literals)]
         let port = vsock_port as u16;
+        if port == KOI_SOCKS5_PORT as u16 {
+            Self::set_socks5_trigger();
+        }
         info!("koiService: registering reverse-connected port {vsock_port} (port {port})");
         self.register_reverse_connection_port(port)
     }

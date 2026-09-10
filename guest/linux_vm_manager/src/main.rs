@@ -59,11 +59,15 @@ impl DeathRecipient for DeathReporter {
     }
 }
 
+pub fn umask(umask: u32) {
+	unsafe { libc::umask(umask as libc::mode_t); }
+}
+
 fn get_vms_rpc_binder(death_recipient: Arc<DeathReporter>) -> Result<(RpcSession, Strong<dyn IVirtualMachineService>)> {
     let vsock_port = vsock::get_local_cid().context("Could not determine local CID")?;
     info!("Starting service with cid={vsock_port}");
 
-    let socket = "/tmp/IVMS.socket";
+    let socket = "/tmp/linux_vm_manager/IVMS.socket";
     info!("Launching socat {socket} <> VSOCK-CONNECT:{VMADDR_CID_HOST}:{vsock_port}");
     std::fs::remove_file(socket).ok();
     std::process::Command::new("socat")
@@ -93,6 +97,8 @@ fn get_vms_rpc_binder(death_recipient: Arc<DeathReporter>) -> Result<(RpcSession
 }
 
 fn main() -> Result<()> {
+    umask(0o077); // default to rwx------ file permission
+    std::fs::create_dir("/tmp/linux_vm_manager").ok();
     env_logger::builder().filter_level(log::LevelFilter::Debug).init();
     info!("Starting linux_vm_manager");
 

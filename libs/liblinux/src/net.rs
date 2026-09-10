@@ -99,8 +99,9 @@ pub fn get_listening_tcp4_ports_from_localhost() -> Result<HashMap<u16, String>,
         if !socket_addr.ip().is_loopback() && !socket_addr.ip().is_unspecified() {
             continue;
         }
-        let Some(comm) = proc.comm_with_inode(items[INODE_IDX].parse()?) else {
-            continue;
+        let comm = match proc.comm_with_inode(items[INODE_IDX].parse()?) {
+            Some(comm) => comm,
+            None => "unknown".to_string(),
         };
         entries.insert(socket_addr.port(), comm.clone());
     }
