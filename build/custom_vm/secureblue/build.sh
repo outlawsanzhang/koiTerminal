@@ -79,9 +79,10 @@ boot_qemu() {
         -drive "if=pflash,file=AAVMF_CODE.fd,format=raw${UEFI_RO}" \
         -drive "if=pflash,file=AAVMF_VARS.fd,format=raw${UEFI_RO}" \
         -drive "if=virtio,file=secureblue-sys0.qcow2,cache=unsafe,discard=unmap,id=hd0" \
-        -drive "if=virtio,file=secureblue-usr0.qcow2,cache=unsafe,discard=unmap,id=hd1" \
-        ${VDC_ARGS:+-drive} ${VDC_ARGS:+"${VDC_ARGS}"} \
+        -drive "if=virtio,file=secureblue-var0.qcow2,cache=unsafe,discard=unmap,id=hd1" \
+        -drive "if=virtio,file=secureblue-hom0.qcow2,cache=unsafe,discard=unmap,id=hd2" \
         ${VDD_ARGS:+-drive} ${VDD_ARGS:+"${VDD_ARGS}"} \
+        ${VDE_ARGS:+-drive} ${VDE_ARGS:+"${VDE_ARGS}"} \
         -nic user
     exit_code="$?"
     stty intr ^C # change back interrupt to Ctrl-C
@@ -99,13 +100,15 @@ date
 echo "Install Fedora Silverblue in QEMU by using Kickstart. This takes hours. Good luck."
 echo
 qemu-img create -f qcow2 secureblue-sys0.qcow2 20G
-qemu-img create -f qcow2 secureblue-usr0.qcow2 10G
+qemu-img create -f qcow2 secureblue-var0.qcow2 10G
+qemu-img create -f qcow2 secureblue-hom0.qcow2 10G
 cp /usr/share/AAVMF/AAVMF_{CODE,VARS}.fd ./
 # UEFI_RO=",readonly=on" \
-VDC_ARGS="if=virtio,file=$KICKSTART_FEDORA_ISO,media=cdrom,cache=unsafe,readonly=on,id=cc" \
+VDD_ARGS="if=virtio,file=$KICKSTART_FEDORA_ISO,media=cdrom,cache=unsafe,readonly=on,id=cc" \
     boot_qemu
 qemu-img snapshot -c 1_install secureblue-sys0.qcow2
-qemu-img snapshot -c 1_install secureblue-usr0.qcow2
+qemu-img snapshot -c 1_install secureblue-var0.qcow2
+qemu-img snapshot -c 1_install secureblue-hom0.qcow2
 
 # Boot 2
 echo
@@ -113,10 +116,11 @@ date
 echo "Boot 2: Silverblue from disk. Rebase into Secureblue in QEMU by running" \
      "/home/droid/run_install_secureblue.sh in .bash_profile."
 echo
-VDC_ARGS="if=virtio,file=install_secureblue_step_2_switch.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd2" \
+VDD_ARGS="if=virtio,file=install_secureblue_step_2_switch.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
     boot_qemu
 qemu-img snapshot -c 2_switch secureblue-sys0.qcow2
-qemu-img snapshot -c 2_switch secureblue-usr0.qcow2
+qemu-img snapshot -c 2_switch secureblue-var0.qcow2
+qemu-img snapshot -c 2_switch secureblue-hom0.qcow2
 
 # # Boot 3 skipped (subsumed into boot 2)
 # echo
@@ -124,10 +128,11 @@ qemu-img snapshot -c 2_switch secureblue-usr0.qcow2
 # echo "Boot 3: Secureblue from disk. Configure Secureblue in QEMU by running" \
 #      "/home/droid/run_install_secureblue.sh in .bash_profile."
 # echo
-# VDC_ARGS="if=virtio,file=install_secureblue_step_3_config.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd2" \
+# VDD_ARGS="if=virtio,file=install_secureblue_step_3_config.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
 #     boot_qemu
 # qemu-img snapshot -c 3_config secureblue-sys0.qcow2
-# qemu-img snapshot -c 3_config secureblue-usr0.qcow2
+# qemu-img snapshot -c 3_config secureblue-var0.qcow2
+# qemu-img snapshot -c 3_config secureblue-hom0.qcow2
 
 # Boot 4
 echo
@@ -135,10 +140,11 @@ date
 echo "Boot 4: Secureblue from disk. Set Secureblue kernel arguments in QEMU by running" \
      "/home/droid/run_install_secureblue.sh in .bash_profile."
 echo
-VDC_ARGS="if=virtio,file=install_secureblue_step_4_kargs.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd2" \
+VDD_ARGS="if=virtio,file=install_secureblue_step_4_kargs.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
     boot_qemu
 qemu-img snapshot -c 4_kargs secureblue-sys0.qcow2
-qemu-img snapshot -c 4_kargs secureblue-usr0.qcow2
+qemu-img snapshot -c 4_kargs secureblue-var0.qcow2
+qemu-img snapshot -c 4_kargs secureblue-hom0.qcow2
 
 # Boot 5
 echo
@@ -146,10 +152,11 @@ date
 echo "Boot 5: Secureblue from disk. Install alt kernel in QEMU by running" \
      "/home/droid/run_install_secureblue.sh in .bash_profile. This takes hours. Good luck."
 echo
-VDC_ARGS="if=virtio,file=install_secureblue_step_5_check_kernel.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd2" \
+VDD_ARGS="if=virtio,file=install_secureblue_step_5_check_kernel.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
     boot_qemu
 qemu-img snapshot -c 5_check_kernel secureblue-sys0.qcow2
-qemu-img snapshot -c 5_check_kernel secureblue-usr0.qcow2
+qemu-img snapshot -c 5_check_kernel secureblue-var0.qcow2
+qemu-img snapshot -c 5_check_kernel secureblue-hom0.qcow2
 
 # Boot 6
 echo
@@ -157,39 +164,45 @@ date
 echo "Boot 6: Secureblue from disk. Clean up in QEMU by running" \
      "/home/droid/run_install_secureblue.sh in .bash_profile."
 echo
-VDC_ARGS="if=virtio,file=install_secureblue_step_6_cleanup.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd2" \
+VDD_ARGS="if=virtio,file=install_secureblue_step_6_cleanup.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
     boot_qemu
 qemu-img snapshot -c 6_cleanup secureblue-sys0.qcow2
-qemu-img snapshot -c 6_cleanup secureblue-usr0.qcow2
+qemu-img snapshot -c 6_cleanup secureblue-var0.qcow2
+qemu-img snapshot -c 6_cleanup secureblue-hom0.qcow2
 
 # Sparsify and expand disks
 date
 qemu-img create -f qcow2 secureblue-system.qcow2 80G
-qemu-img create -f qcow2 secureblue-user.qcow2 1024G
+qemu-img create -f qcow2 secureblue-var.qcow2 1024G
+qemu-img create -f qcow2 secureblue-home.qcow2 1024G
+qemu-img create -f qcow2 secureblue-empty.qcow2 1024G # This is for the user's convenience
 mkdir -p sparse
 TMPDIR="`pwd`/sparse" virt-sparsify secureblue-sys0.qcow2 sparse/secureblue-system.qcow2
 virt-resize --expand /dev/vda3 sparse/secureblue-system.qcow2 secureblue-system.qcow2
 rm sparse/secureblue-system.qcow2
-TMPDIR="`pwd`/sparse" virt-sparsify secureblue-usr0.qcow2 sparse/secureblue-user.qcow2
-virt-resize --expand /dev/vda1 sparse/secureblue-user.qcow2 secureblue-user.qcow2
-rm sparse/secureblue-user.qcow2
+TMPDIR="`pwd`/sparse" virt-sparsify secureblue-var0.qcow2 sparse/secureblue-var.qcow2
+virt-resize --expand /dev/vda1 sparse/secureblue-var.qcow2 secureblue-var.qcow2
+rm sparse/secureblue-var.qcow2
+TMPDIR="`pwd`/sparse" virt-sparsify secureblue-hom0.qcow2 sparse/secureblue-home.qcow2
+virt-resize --expand /dev/vda1 sparse/secureblue-home.qcow2 secureblue-home.qcow2
+rm sparse/secureblue-home.qcow2
 
 ls -l secureblue*.qcow2 sparse
 date
 
 touch cidata.iso
 echo dummy > cidata.build_id
-if [ -e build_id ] && [ -e vm_config.json ] && [ -e u-boot.bin ]; then
-    tar czf "${output}" build_id vm_config.json cidata.iso cidata.build_id u-boot.bin secureblue-user.qcow2 secureblue-system.qcow2
+# pack up image
+IMAGE_CONTENT="build_id vm_config.json cidata.iso cidata.build_id u-boot.bin secureblue-empty.qcow2 secureblue-home.qcow2 secureblue-var.qcow2 secureblue-system.qcow2"
+if ls $(echo $IMAGE_CONTENT); then
+    tar czf "${output}" $IMAGE_CONTENT
     # gzip -9 images.tar
     ls -l "${output}"
 else
     echo '
         Please find the following files:
-        - build_id
-        - vm_config.json
-        - u-boot.bin
-        Then run `tar czf "'${output}'" build_id vm_config.json cidata.iso cidata.build_id u-boot.bin secureblue-user.qcow2 secureblue-system.qcow2`.
+            '$TAR_REQUIREMENTS'
+        Then run `tar czf "'${output}'" '$IMAGE_CONTENT'`.
     '
 fi
 date

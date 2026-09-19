@@ -154,7 +154,7 @@ cmd = "sed -i 's@[Ii]nstall@Kickstart Install@g' " + CWD + ISO_SOURCE_EXTRACT + 
 os.system(cmd)
 cmd = "sed -i 's@timeout=.*@timeout=5@g' " + CWD + ISO_SOURCE_EXTRACT + "/" + GRUB_CFG
 os.system(cmd)
-cmd = "sed -i 's@vmlinuz@vmlinuz inst.ks=hd:vdc:/ks.cfg@g' " + CWD + ISO_SOURCE_EXTRACT + "/" + GRUB_CFG
+cmd = "sed -i 's@vmlinuz@vmlinuz inst.ks=hd:vdd:/ks.cfg@g' " + CWD + ISO_SOURCE_EXTRACT + "/" + GRUB_CFG
 os.system(cmd)
 
 # Check if kickstart ISO already exists

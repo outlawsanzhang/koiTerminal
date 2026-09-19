@@ -6,7 +6,11 @@
             "writable": true
         },
         {
-            "image": "$PAYLOAD_DIR/secureblue-user.qcow2",
+            "image": "$PAYLOAD_DIR/secureblue-var.qcow2",
+            "writable": true
+        },
+        {
+            "image": "$PAYLOAD_DIR/secureblue-home.qcow2",
             "writable": true
         },
         {

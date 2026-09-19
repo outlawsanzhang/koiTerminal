@@ -36,7 +36,7 @@ ostree admin status
 rpm-ostree status
 
 # Alt: install kernel from file
-# mount /dev/vdd /mnt
+# mount /dev/vde /mnt
 # rpm-ostree override replace /mnt/kernel-*.rpm
 # To revert, run: rpm-ostree override reset kernel{,-core,-modules,-modules-core,-modules-extra}
 # See: https://discussion.fedoraproject.org/t/dracut-and-ostree/731/5
