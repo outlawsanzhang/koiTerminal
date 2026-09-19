@@ -7,6 +7,10 @@ To be added...
 Port forwarding bypasses the VM's network setup and exposes user-approved ports directly on localhost.
 Other apps in the same Android user profile (for Android 16 and earlier, all other apps on device) can connect to it.
 
+Do note that there could be many covert communication channels between malicious apps on the VM and the host, and many of them unfixable.
+For example, they can use CPU usage as a noisy analog signal medium.
+Linux apps can monitor steal time (CPU usage by the host and other VMs), Android apps can monitor battery usage, and both can run stress tests to emit signals.
+
 ### No network
 On its own, this option is not sufficient to airgap the VM. The VM communicates with koiTerminal through the following channels. Leakage may exist. <!-- UPDATE -->
 - Port forwarding is not automatically disabled, and can establish bidirectional communication to the outside world.
@@ -16,10 +20,6 @@ On its own, this option is not sufficient to airgap the VM. The VM communicates 
     - AVF confines all other VSOCK communication with the VM to the app that spawns it (`connectVsock`/`connectToVsockServer`).
       For now, koiTerminal connects to (1) the [VM service](libs/debian_service/aidl/com/android/virtualization/debian/aidl/IDebianService.aidl) from the vanilla Linux Terminal app for port forwarding, and clipboard sharing, (2) the ttyd service guarded by a [random password](android/TerminalApp/java/com/android/virtualization/koiterminal/AndroidToVmBridge.kt), and (3) an [additional service](libs/debian_service/aidl/com/android/virtualization/debian/aidl/IkoiService.aidl) for hosting the SOCKS5 proxy which is turned off in this mode.
 - Virtual hardware also facilitates communication: consoles, mouse, keyboard, display, sound, and disk images.
-
-Do note that there could be many covert channels between malicious apps on the VM and the host, and many of them unfixable.
-For example, they can use CPU usage as a noisy analog signal medium.
-Linux apps can monitor steal time (CPU usage by the host and other VMs), Android apps can monitor battery usage, and both can run stress tests to emit signals.
 
 ### Raw network
 This is the default used by the vanilla Linux Terminal app.
