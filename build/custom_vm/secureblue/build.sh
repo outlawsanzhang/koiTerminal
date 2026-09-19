@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -ex
 
 SCRIPT_DIR="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 
@@ -35,6 +35,21 @@ parse_options() {
 
 
 check_sudo
+
+# For u-boot.bin, see build/custom_vm/alpine/README.md
+# For linux_vm_manager, see guest/linux_vm_manager/README.md
+# For tun2proxy-bin, see https://github.com/tun2proxy/tun2proxy (build with `--target aarch64-unknown-linux-gnu --release`)
+TAR_REQUIREMENTS="build_id vm_config.json u-boot.bin cidata.build_id"
+BUILD_REQUIREMENTS="../cidata/root_files/usr/local/bin/linux_vm_manager ../cidata/root_files/usr/local/bin/tun2proxy-bin ../cidata/root_files/etc/systemd/system/"
+if ! ls -d $(echo $TAR_REQUIREMENTS $BUILD_REQUIREMENTS); then
+    echo '
+        Please find the following files/folders:
+            '$TAR_REQUIREMENTS $BUILD_REQUIREMENTS'
+        Then run me again.
+    '
+    exit 1
+fi
+
 output=images.tar.gz
 workdir="${SCRIPT_DIR}"
 
@@ -137,7 +152,7 @@ qemu-img snapshot -c 2_switch secureblue-hom0.qcow2
 # Boot 4
 echo
 date
-echo "Boot 4: Secureblue from disk. Set Secureblue kernel arguments in QEMU by running" \
+echo "Boot 4: Secureblue from disk. Install packages and set Secureblue kernel arguments in QEMU by running" \
      "/home/droid/run_install_secureblue.sh in .bash_profile."
 echo
 VDD_ARGS="if=virtio,file=install_secureblue_step_4_kargs.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
@@ -170,6 +185,17 @@ qemu-img snapshot -c 6_cleanup secureblue-sys0.qcow2
 qemu-img snapshot -c 6_cleanup secureblue-var0.qcow2
 qemu-img snapshot -c 6_cleanup secureblue-hom0.qcow2
 
+# No-boot 7
+echo
+date
+echo "No-boot 7: direct filesystem manipulations."
+echo
+bash install_secureblue_step_7_file_ops.sh
+qemu-img snapshot -c 7_files secureblue-sys0.qcow2
+qemu-img snapshot -c 7_files secureblue-var0.qcow2
+qemu-img snapshot -c 7_files secureblue-hom0.qcow2
+
+
 # Sparsify and expand disks
 date
 qemu-img create -f qcow2 secureblue-system.qcow2 80G
@@ -190,8 +216,10 @@ rm sparse/secureblue-home.qcow2
 ls -l secureblue*.qcow2 sparse
 date
 
-touch cidata.iso
-echo dummy > cidata.build_id
+# build cidata.iso
+chmod a+rx ../cidata/root_files/usr/local/bin/{linux_vm_manager,tun2proxy-bin}
+genisoimage -output cidata.iso -V cidata -J -R ../cidata/
+
 # pack up image
 IMAGE_CONTENT="build_id vm_config.json cidata.iso cidata.build_id u-boot.bin secureblue-empty.qcow2 secureblue-home.qcow2 secureblue-var.qcow2 secureblue-system.qcow2"
 if ls $(echo $IMAGE_CONTENT); then

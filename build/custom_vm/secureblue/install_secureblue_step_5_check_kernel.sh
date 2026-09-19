@@ -4,6 +4,10 @@
 set -ex -o pipefail
 
 # Reclaim space. Remove anything pending as well.
+systemctl stop rpm-ostreed-automatic.timer
+systemctl stop flatpak-system-update.timer
+systemctl stop brew-update.timer
+systemctl stop podman-auto-update.timer
 rpm-ostree cancel
 while ! rpm-ostree cleanup --base --repomd --rollback --pending; do
     sleep 10

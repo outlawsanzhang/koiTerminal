@@ -1,0 +1,46 @@
+[Unit]
+Description=koiTerminal tunnel setup
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/sh -c ' \
+    /usr/bin/ip tuntap add dev koi mode tun pi on && \
+    /usr/bin/ip link set dev koi addrgenmode random up && \
+    /usr/bin/ip addr add 10.0.0.33 peer 10.0.0.1/24 dev koi scope global && \
+    /usr/bin/ip route add default dev koi proto static scope global && \
+    /usr/bin/ip -6 route add default dev koi proto static scope global && \
+    /usr/bin/resolvectl dns koi 10.0.0.1 \
+'
+
+DevicePolicy=closed
+# InaccessiblePaths=/run/dbus/ /run/user/
+InaccessiblePaths=/run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+# PrivateDevices=yes
+# DeviceAllow does not work, though
+DeviceAllow=/dev/net/tun
+PrivateIPC=yes
+# PrivateNetwork=yes
+ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=CAP_NET_ADMIN
+ReadWritePaths=

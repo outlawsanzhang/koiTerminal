@@ -16,8 +16,8 @@
         {
             "partitions": [
                 {
-                    "label": "CA_CERT",
-                    "path": "$PAYLOAD_DIR/../ca.crt",
+                    "label": "CIDATA",
+                    "path": "$PAYLOAD_DIR/cidata.iso",
                     "writable": false
                 }
             ],

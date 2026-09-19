@@ -1,0 +1,50 @@
+[Unit]
+Description=koiTerminal linux_vm_manager: guest agent and services
+Requires=koi-cidata.service koi-namespace.service
+After=koi-cidata.service koi-namespace.service
+Before=network.target
+JoinsNamespaceOf=koi-namespace.service
+
+[Service]
+ExecStart=/usr/bin/sh -c '/run/cidata/root_files/usr/local/bin/linux_vm_manager'
+Restart=on-failure
+# User=nobody
+DynamicUser=yes
+Group=koi-services
+RestartSec=1s
+RestartSteps=8
+RestartMaxDelaySec=256s
+
+DevicePolicy=closed
+InaccessiblePaths=/run/dbus/ /run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+# PrivateDevices=yes
+# DeviceAllow does not work, though
+DeviceAllow=/dev/vsock
+PrivateIPC=yes
+# PrivateNetwork=yes
+# ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_VSOCK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=
+
+
+[Install]
+WantedBy=network.target

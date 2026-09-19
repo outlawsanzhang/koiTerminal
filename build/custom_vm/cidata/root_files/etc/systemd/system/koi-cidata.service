@@ -1,0 +1,53 @@
+[Unit]
+Description=koiTerminal mounting cidata
+Wants=koi-namespace.service
+After=koi-namespace.service
+Before=network-pre.target
+JoinsNamespaceOf=koi-namespace.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/sh -c ' \
+  for PART in /dev/vd[a-z][0-9]; do \
+    if [ "CIDATA" == "$(/usr/bin/sfdisk --part-label ${PART::-1} ${PART:0-1} 2>/dev/null)" ]; then \
+      /usr/bin/echo $PART; \
+    fi; \
+  done > /run/CIPART; \
+  if [ 1 -lt "$(/usr/bin/cat /run/CIPART | wc -l)" ]; then \
+    /usr/bin/echo ERROR: multiple partitions labeled CIDATA 2>&1; \
+    exit 1; \
+  elif [ 1 -gt "$(/usr/bin/cat /run/CIPART | wc -l)" ]; then \
+    /usr/bin/echo ERROR: no partition labeled CIDATA 2>&1; \
+    exit 1; \
+  fi; \
+  /usr/bin/mkdir -p /run/cidata; \
+  /usr/bin/mount $(/usr/bin/cat /run/CIPART) /run/cidata'
+
+# DevicePolicy=closed
+# InaccessiblePaths=/run/dbus/ /run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+# PrivateDevices=yes
+# PrivateIPC=yes
+# PrivateNetwork=yes
+# ProcSubset=pid
+# ProtectClock=yes
+# ProtectControlGroups=yes
+# ProtectHostname=yes
+# ProtectKernelLogs=yes
+# ProtectKernelModules=yes
+# ProtectKernelTunables=yes
+# ReadOnlyPaths=/
+# PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+# RestrictNamespaces=yes
+RestrictRealtime=yes
+# RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+# SystemCallFilter=@system-service @mount
+# SystemCallFilter=~@aio @chown @keyring @memlock @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=CAP_SYS_ADMIN
+# ReadWritePaths=

@@ -1,0 +1,44 @@
+[Unit]
+Description=koiTerminal tun2proxy: tunnel over SOCKS5
+Requires=koi-vm-manager.service koi-cidata.service koi-tun.service koi-namespace.service
+After=koi-vm-manager.service koi-cidata.service koi-tun.service koi-namespace.service
+Before=network.target
+JoinsNamespaceOf=koi-namespace.service
+
+[Service]
+ExecStart=/usr/bin/sh -c '/run/cidata/root_files/usr/local/bin/tun2proxy-bin --proxy socks5://127.0.0.1:10805 --tun koi -6 --dns virtual --bypass 198.18.0.0/15'
+Restart=on-failure
+# User=nobody
+DynamicUser=yes
+RestartSec=1s
+RestartSteps=8
+RestartMaxDelaySec=256s
+
+DevicePolicy=closed
+InaccessiblePaths=/run/dbus/ /run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+# PrivateDevices=yes
+DeviceAllow=/dev/net/tun
+PrivateIPC=yes
+# PrivateNetwork=yes
+ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=

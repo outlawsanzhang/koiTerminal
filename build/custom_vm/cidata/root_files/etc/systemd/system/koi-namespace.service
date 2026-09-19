@@ -1,0 +1,39 @@
+[Unit]
+Description=koiTerminal namespace holder
+Before=network-pre.target
+
+[Service]
+ExecStartPre=+/usr/bin/sh -c '/usr/bin/mkdir -p /run/linux_vm_manager && /usr/bin/chmod g+rws /run/linux_vm_manager && /usr/bin/chgrp koi-services /run/linux_vm_manager'
+ExecStart=/usr/bin/sh -c '/usr/bin/rm -rf /tmp/shutdown.pipe || /usr/bin/true; /usr/bin/mkfifo /tmp/shutdown.pipe && /usr/bin/chmod 660 /tmp/shutdown.pipe && /usr/bin/read shutdown < /tmp/shutdown.pipe && /usr/bin/poweroff'
+Restart=on-failure
+RestartSec=1s
+Group=koi-services
+
+DevicePolicy=closed
+# InaccessiblePaths=/run/user/ /run/dbus
+InaccessiblePaths=/run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateIPC=yes
+PrivateNetwork=yes
+ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=

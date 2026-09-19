@@ -1,0 +1,9 @@
+[Unit]
+Description=koiTerminal tunnel over SOCKS5 setup trigger
+Before=network-pre.target
+
+[Path]
+PathExists=/run/linux_vm_manager/socks5.trigger
+
+[Install]
+WantedBy=network.target
