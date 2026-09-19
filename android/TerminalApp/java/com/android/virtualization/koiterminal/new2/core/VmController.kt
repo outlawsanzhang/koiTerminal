@@ -310,13 +310,13 @@ object VmController {
                             }
                             val debian_service = IDebianService.Stub.asInterface(binder)
 
-                            var koi_binder: IBinder? = null
+                            var koi_service: IkoiService? = null
                             try {
-                                koi_binder = vm.connectToVsockServer(IkoiService.VSOCK_PORT)
+                                val koi_binder = vm.connectToVsockServer(IkoiService.VSOCK_PORT)
+                                koi_service = koi_binder?.let { IkoiService.Stub.asInterface(it) }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Guest koiService agent cannot be registered", e)
                             }
-                            val koi_service = koi_binder?.let { IkoiService.Stub.asInterface(it) }
 
                             _guestAgentController.value?.start(guestAgent, debian_service, koi_service)
 
