@@ -92,7 +92,7 @@ class GuestAgentController(
             return
         }
         val vm = this.vm!!
-        Log.d(TAG, "Starting guest agent controller with AIDL, cid=${vm.cid}")
+        Log.d(TAG, "Starting guest agent controller with AIDL")
         if (debianService != null) {
             Log.w(TAG, "GuestAgentController is started again. It might had been crashed.")
             stop() // Safely stop existing before recreating

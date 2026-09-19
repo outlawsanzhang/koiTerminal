@@ -77,7 +77,7 @@ internal class DebianService(
         scope.launch(Dispatchers.IO) {
             try {
                 val setup = ForwarderHostSetup(koiService.getRcServicesAndSetupGuest(enableSocks5), socks5)
-                ForwarderHost.run(vm.cid, setup, ForwarderHostCallback(service, vm))
+                ForwarderHost.run(0, setup, ForwarderHostCallback(service, vm))
             } catch (e: Exception) {
                 Log.d(TAG, "Exception from JNI", e)
             }

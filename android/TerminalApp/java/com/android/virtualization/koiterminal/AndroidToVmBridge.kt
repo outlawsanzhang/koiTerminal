@@ -51,7 +51,6 @@ class AndroidToVmBridge(
         private const val BUFFER_SIZE = 8192
     }
 
-    private val vmCid: Int = vm.getCid()
     private val authCookie = "access_token=$secretKey"
     private var serverSocket: ServerSocket? = null
     private val isRunning = AtomicBoolean(false)
@@ -71,7 +70,7 @@ class AndroidToVmBridge(
             this.isRunning.set(true)
 
             val port = socket.localPort
-            Log.i(TAG, "Bridge started on 127.0.0.1:$port (Target VM: $vmCid:$vmPort)")
+            Log.i(TAG, "Bridge started on 127.0.0.1:$port (Target VM port:$vmPort)")
 
             thread(name = "Bridge-Listener") { listenLoop(socket) }
             port
@@ -190,8 +189,6 @@ class AndroidToVmBridge(
     // TODO(b/464250786): when a guest agent notifies the host when it is ready, we don't need to
     // keep trying until it is ready.
     private fun connectWithRetry(): ParcelFileDescriptor? {
-        // val vmAddress = VmSocketAddress(vmPort, vmCid)
-
         for (i in 1..MAX_RETRIES) {
             if (!isRunning.get()) return null
 

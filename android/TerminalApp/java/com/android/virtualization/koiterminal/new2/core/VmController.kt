@@ -318,7 +318,6 @@ object VmController {
                             }
                             val koi_service = koi_binder?.let { IkoiService.Stub.asInterface(it) }
 
-                            val cid = vm!!.cid
                             _guestAgentController.value?.start(guestAgent, debian_service, koi_service)
 
                             Log.d(TAG, "Guest agent ready")
