@@ -56,7 +56,7 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
 - There is a decent chance that this will be abandonware, especially if a major part of this is upstreamed to GrapheneOS. Again, AS-IS.
 - Known sharp edges: <!-- UPDATE -->
     - Just crashes when files referenced in `vm_config.json` are not found, without indicating which.
-    - Some images have issues, such as Alpine having network issues, and Secureblue not shutting down properly. See [IMAGES.md](IMAGES.md) for details.
+    - Some images have issues, such as Alpine having network issues. See [IMAGES.md](IMAGES.md) for details.
 
 ## Progress and plans
 Goals are mainly targeted at things that neither Google nor GrapheneOS is inclined to do in the near future.
@@ -84,8 +84,13 @@ These goals may change, and they may or may not be achievable. We will have to s
     - Supported by disabling network and including a managed SOCKS5 proxy
     - [X] Provide option to control network, SOCKS5, loopback, local network, etc.
 - [ ] Fix Secureblue image
+    - [X] Support port-forwarding and network proxies out-of-the-box
     - [ ] Add support for display.
     - [ ] Add support for file transfer.
+- [ ] FIXME for serial console
+    - [ ] Make pty changes work
+    - [ ] Make mouse selection / middle button and keyboard Ctrl+Shift+C Ctrl+Insert etc. work in serial terminal
+    - [ ] Bug that deleting VM files confuses the app
 - [ ]  (stretch) Build 6.12 LTS vanilla kernel RPM package for Secureblue?
 - [ ] Implement a super-config system, including support for multiple `vm_config.json` files for different modes (install, update, use, isolated software, airgap...) or just different VMs.
     - put settings for `console_in`, `default_console` (ttyd/serial), `disposable`, `vm_config_path`, etc. there.
@@ -95,8 +100,6 @@ These goals may change, and they may or may not be achievable. We will have to s
     - Try bundling the compiled crosvm binary when building GrapheneOS. See: https://u1f383.github.io/android/2025/06/15/run-native-binary-on-android.html
     - Try passing file descriptors to avoid permission issues
 - [ ] FIXME for serial console
-    - [ ] Make pty changes work
-    - [ ] Make mouse work in serial terminal
     - [ ] Find out which kernel versions and what configurations work. How about 6.6 LTS?
 - [ ]  (stretch) Enable forcing the VM to use the host vpn
 - [ ] Write a install guide inside the app
@@ -110,6 +113,9 @@ These goals may change, and they may or may not be achievable. We will have to s
     - Make the mouse work (offset issue)
 - [ ] Support holding modifier keys (in ttyd too)
 - [ ]  (stretch) Enable forcing the VM to use the host vpn
+- [ ]  (stretch) WebUSB forwarding device to the VM
+- [ ]  (stretch) VM image for Windows guests (image subject to DMCA, but build scripts / conversion scripts should live)
+- [ ]  (stretch) VM image for Android guests
 
 Suggested by community:
 - Only applies to ttyd:
