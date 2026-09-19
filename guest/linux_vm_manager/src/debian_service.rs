@@ -317,7 +317,8 @@ impl KoiService {
         server
     }
 
-    async fn reverse_connect_once(
+    // Must not be called in task::spawn() threads
+    async fn reverse_connect_once_blocking(
         listeners: &mut TcpListeners,
         vlistener: &VsockListener,
         port: u16,
@@ -325,9 +326,9 @@ impl KoiService {
     ) -> anyhow::Result<AsyncForwarderSession> {
         let mut socket = listeners.accept().await
             .inspect_err(|e| error!("Cannot accept connection to TCP port {port}: {e}"))?;
-        Self::request_reverse_connection(callback, port.into())
+        Self::request_reverse_connection_blocking(callback, port.into())
             .inspect_err(|e| error!("Cannot request vsock connection on port {port} from host: {e}"))?;
-        let vsock_connection = vlistener.accept(); // TODO: this is blocking, not async...
+        let vsock_connection = vlistener.accept();
         if let Err(e) = vsock_connection {
             error!("Cannot request vsock connection on port {port} from host: {e}");
             socket.shutdown().await
@@ -335,7 +336,6 @@ impl KoiService {
             return Err(anyhow!(e));
         }
         let (vsock, _) = vsock_connection.unwrap();
-        // note: socket is already nonblocking
         vsock.set_nonblocking(false)
             .inspect_err(|e| error!("Cannot set vsock connection on port {port} to blocking: {e}"))?;
         let socket = socket.into_std()
@@ -351,17 +351,18 @@ impl KoiService {
         ))
     }
 
-    async fn run_reverse_connection_listener(
+    // Must not be called in task::spawn() threads
+    async fn run_reverse_connection_listener_blocking(
         port: u16, callback: SharedIkoiHostCallback,
     ) -> Result<()> {
         let mut listeners = TcpListeners::bind(port).await?;
         let vlistener = VsockListener::bind_with_cid_port(vsock::VMADDR_CID_ANY, port.into())
             .inspect_err(|e| error!("Cannot listen to vsock port {port}: {e}"))?;
         loop {
-            if let Ok(session) = Self::reverse_connect_once(
+            if let Ok(session) = Self::reverse_connect_once_blocking(
                 &mut listeners, &vlistener, port, callback.clone()
             ).await {
-                task::spawn(async move { AsyncForwarderSession::run(session).await });
+                task::spawn(AsyncForwarderSession::run(session));
             }
         }
     }
@@ -393,7 +394,7 @@ impl KoiService {
             if !managed_ports.contains(&vsock_port) {
                 managed_ports.insert(vsock_port);
                 o.insert(self.rt.spawn_blocking(move || tokio::runtime::Handle::current().block_on(
-                    Self::run_reverse_connection_listener(vsock_port, callback)
+                    Self::run_reverse_connection_listener_blocking(vsock_port, callback)
                 )));
                 return Ok(())
             }
@@ -402,7 +403,7 @@ impl KoiService {
         Err(Status::new_service_specific_error(-1, None))
     }
 
-    fn request_reverse_connection(
+    fn request_reverse_connection_blocking(
         callback: SharedIkoiHostCallback,
         vsock_port: i32
     ) -> BinderResult<()> {

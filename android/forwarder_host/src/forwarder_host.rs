@@ -243,6 +243,7 @@ impl RcSocks5Proxy {
         }
     }
 
+    // FIXME: Not blocking if AsyncBorrowedFdStream becomes actually non-blocking
     async fn run_tcp_proxy_blocking<'a>(
         proto: Socks5ServerProtocol<AsyncBorrowedFdStream<'a>, states::CommandRead>,
         addr: &TargetAddr,
@@ -302,6 +303,7 @@ impl RcSocks5Proxy {
         Ok(())
     }
 
+    // FIXME: Not blocking if AsyncBorrowedFdStream becomes actually non-blocking
     async fn run_new_connection_blocking(fd: RawFd, setup: Arc<Socks5Setup>) -> SocksResult<()> {
         // Safety: only other operation is closing the vsock, which happens outside the scope of `stream`
         let stream = unsafe { AsyncBorrowedFdStream::new(&fd) }?;
@@ -343,6 +345,7 @@ impl ReverseConnectedService for RcSocks5Proxy {
         self.vsock_port
     }
 
+    // FIXME: TcpStream::connect is blocking.
     fn on_new_connection(&mut self, fd: RawFd) -> Result<Option<ForwarderSession>> {
         let setup = self.setup.clone();
         // Delegated proxy:
@@ -357,10 +360,11 @@ impl ReverseConnectedService for RcSocks5Proxy {
         // AsyncBorrowedFdStream pretends to be an async task but is actually blocking,
         // and cannot be implemented as non-blocking due to Android restrictions on
         // file descriptor set non-blocking and query buffer emptiness
+        // FIXME: Not blocking if AsyncBorrowedFdStream becomes actually non-blocking
         self.rt.spawn_blocking(move || {
-            let result = tokio::runtime::Handle::current().block_on(async move {
-                Self::run_new_connection_blocking(fd, setup).await
-            });
+            let result = tokio::runtime::Handle::current().block_on(
+                Self::run_new_connection_blocking(fd, setup)
+            );
             let mut revdisc_queue = REVDISC_QUEUE.lock().unwrap();
             revdisc_queue.push_back(fd);
             REVDISC_EVT.write(1).expect("failed to write reverse-disconnect eventfd");
@@ -603,6 +607,9 @@ impl<'a> ForwarderSessions<'a> {
         hostDisconnectVsock(&mut self.jni_env, &self.jni_cb, fd)
     }
 
+    // FIXME: it feels that upstream implemented this in a way that, if the VM is very slow in either
+    //     accepting connections or reading what this writes, then this function would be blocked
+    //     on processing just one event, and the rest gets queued up until it unblocks.
     fn run(mut self) -> Result<()> {
         let poll_ctx: PollContext<Token> = PollContext::new().map_err(Error::PollContextNew)?;
         poll_ctx.add(&*UPDATE_EVT, Token::UpdatePorts).map_err(Error::PollContextAdd)?;
@@ -708,6 +715,8 @@ fn hostDisconnectVsock(
 }
 
 /// Creates a forwarder session from a `listener` that has a pending connection to accept.
+/// FIXME: this is blocking. But the upstream version literally blocks with a timeout of 10 seconds 
+///     so it's ok ig idk who cares about DoS amirite
 fn create_forwarder_session(
     listener: &TcpListener,
     _cid: u32,
