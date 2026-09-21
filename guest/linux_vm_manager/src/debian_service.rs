@@ -235,6 +235,7 @@ pub struct KoiService {
     // First mutex is for registering / cloning it, second mutex is for using it
     callback: Mutex<Option<SharedIkoiHostCallback>>,
     registered_ports: Mutex<BTreeMap<u16, task::JoinHandle<Result<()>>>>,
+    resize_tty_busy: Arc<Mutex<bool>>,
 }
 
 impl Interface for KoiService {}
@@ -288,6 +289,7 @@ impl KoiService {
             rt,
             callback: Mutex::new(None),
             registered_ports: Mutex::new(BTreeMap::new()),
+            resize_tty_busy: Arc::new(Mutex::new(false)),
         };
 
         let binder = BnIkoiService::new_binder(service);
@@ -418,6 +420,31 @@ impl KoiService {
         std::fs::File::create("/run/linux_vm_manager/socks5.trigger")
             .map_err(|e| error!("Failed to create socks5.trigger: {e:?}")).ok();
     }
+
+    async fn write_existing_pipe(path: String, content: String) -> tokio::io::Result<()> {
+        let mut pipe = tokio::fs::File::options().write(true).create(false).open(path).await?;
+        pipe.write(content.as_bytes()).await?;
+        Ok(())
+    }
+
+    fn write_existing_pipe_if_idle(&self, path: &str, content: String, busy: Arc<Mutex<bool>>) {
+        if let Ok(mut busy_outer) = busy.lock() {
+            if *busy_outer {
+                error!("{path} is busy");
+            } else {
+                *busy_outer = true;
+                let busy = busy.clone();
+                let path = path.to_string();
+                self.rt.spawn(async move {
+                    Self::write_existing_pipe(path.clone(), content)
+                        .await.inspect_err(|e| error!("Failed to write to {path}: {e}")).ok();
+                    if let Ok(mut busy_inner) = busy.lock() {
+                        *busy_inner = false;
+                    }
+                });
+            }
+        }
+    }
 }
 
 impl IkoiService for KoiService {
@@ -450,5 +477,10 @@ impl IkoiService for KoiService {
 
     fn supportsStorageBalloon(&self) -> BinderResult<bool> {
         Ok(false)
+    }
+
+    fn resizeTtyWindow(&self, target: i32, columns: i32, rows: i32) -> BinderResult<()> {
+        self.write_existing_pipe_if_idle("/tmp/linux_vm_manager/stty.pipe", format!("{target},{columns},{rows}\n"), self.resize_tty_busy.clone());
+        Ok(())
     }
 }

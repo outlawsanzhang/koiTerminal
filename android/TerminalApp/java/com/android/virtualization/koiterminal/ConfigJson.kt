@@ -85,6 +85,10 @@ internal data class ConfigJson(
         return boot_timeout_secs ?: DEFAULT_BOOT_TIMEOUT_SECS
     }
 
+    internal fun getConsoleInputDevice(): String? {
+        return console_input_device
+    }
+
     /** Converts this parsed JSON into VirtualMachineConfig Builder */
     fun toConfigBuilder(context: Context): VirtualMachineConfig.Builder {
         Log.i("ConfigJson.toConfigBuilder", "this = ${this.toString()}")
@@ -297,6 +301,7 @@ internal data class ConfigJson(
     companion object {
         private const val DEBUG = true
         const val DEFAULT_BOOT_TIMEOUT_SECS: Int = 60
+        const val DEFAULT_CONSOLE_INPUT_DEVICE: String = "hvc0"
 
         /** Parses JSON file at jsonPath */
         fun from(context: Context, jsonPath: Path): ConfigJson {

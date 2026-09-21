@@ -21,8 +21,11 @@ import com.android.virtualization.debian.aidl.IkoiHostCallback;
 interface IkoiService {
     const long VSOCK_PORT = 45647; // "IKOIS"
     const long SOCKS5_PORT = 10805;
+    const int TTY_TTYS0 = 0;
+    const int TTY_HVC0 = 1;
 
     void registerHostCallback(IkoiHostCallback callback) = 1;
     boolean supportsStorageBalloon() = 2;
     void openReverseConnectedPort(int vsock_port) = 3; // should block to avoid race conditions (no `oneway`)
+    void resizeTtyWindow(int target, int columns, int rows) = 5;
 }

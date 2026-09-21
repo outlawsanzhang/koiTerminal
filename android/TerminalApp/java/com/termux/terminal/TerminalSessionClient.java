@@ -26,6 +26,8 @@ public interface TerminalSessionClient {
 
     void onTerminalCursorStateChange(boolean state);
 
+    void onResizeTtyWindow(int columns, int rows);
+
     void setTerminalShellPid(@NonNull TerminalSession session, int pid);
 
 

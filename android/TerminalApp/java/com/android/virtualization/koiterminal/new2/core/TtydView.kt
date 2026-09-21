@@ -42,6 +42,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.android.virtualization.koiterminal.CertificateUtils
 import com.android.virtualization.koiterminal.TerminalView
+import com.android.virtualization.koiterminal.new2.core.VmController
 import com.termux.view.TerminalView as TermuxView
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
@@ -488,6 +489,10 @@ class TtySView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         override fun onColorsChanged(session: TerminalSession) {}
 
         override fun onTerminalCursorStateChange(state: Boolean) {}
+
+        override fun onResizeTtyWindow(columns: Int, rows: Int) {
+            VmController.resizeTtyWindow(columns, rows)
+        }
 
         override fun setTerminalShellPid(session: TerminalSession, pid: Int) {}
 

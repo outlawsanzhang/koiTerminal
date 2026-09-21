@@ -26,6 +26,7 @@ import android.system.virtualizationcommon.IGuestAgent
 import android.system.virtualizationservice.DisplayConfig
 import android.system.virtualmachine.VirtualMachine
 import android.system.virtualmachine.VirtualMachineCallback
+import android.system.virtualmachine.VirtualMachineConfig
 import android.system.virtualmachine.VirtualMachineCustomImageConfig
 import android.system.virtualmachine.VirtualMachineException
 import android.system.virtualmachine.VirtualMachineManager
@@ -95,6 +96,12 @@ object VmController {
     var virtualMachine: VirtualMachine? = null
         private set
 
+    private var vmConfig: VirtualMachineConfig? = null
+        private set
+
+    private var vmConfigJson: ConfigJson? = null
+        private set
+
     fun initialize(context: Context) {
         this.context = context.applicationContext
         val key = CertificateUtils.createOrGetKey()
@@ -141,6 +148,16 @@ object VmController {
         repositoryScope.launch { _sessionDiscarded.emit(sessionId) }
     }
 
+    fun resizeTtyWindow(columns: Int, rows: Int) {
+        val target = vmConfigJson?.getConsoleInputDevice() ?: ConfigJson.DEFAULT_CONSOLE_INPUT_DEVICE
+        val targetEnum = when (target) {
+            "hvc0" -> IkoiService.TTY_HVC0
+            "ttyS0" -> IkoiService.TTY_TTYS0
+            else -> IkoiService.TTY_HVC0
+        }
+        _guestAgentController.value?.resizeTtyWindow(targetEnum, columns, rows)
+    }
+
     // It should add and then remove a display to reflect the change.
     fun resizeDisplay(width: Int, height: Int, dpi: Int, refreshRate: Int) {
         val vm = virtualMachine ?: return
@@ -182,6 +199,7 @@ object VmController {
             try {
                 val image = InstalledImage.getDefault(context)
                 val json = ConfigJson.from(context, image.configPath)
+                vmConfigJson = json
                 val configBuilder = json.toConfigBuilder(context)
                 Log.d(TAG, "image.isAidlGuestAgent=${image.isAidlGuestAgent()}")
                 _guestAgentController.value =
@@ -329,6 +347,7 @@ object VmController {
                     virtualMachine = vm
                     vm.setCallback(Executors.newSingleThreadExecutor(), callback)
                     vm.run()
+                    vmConfig = config
                 } catch (e: VirtualMachineException) {
                     // Check for denied Network permission (on GrapheneOS)
                     val serviceSpecificException = e.cause
@@ -343,6 +362,7 @@ object VmController {
                         virtualMachine = vm
                         vm.setCallback(Executors.newSingleThreadExecutor(), callback)
                         vm.run()
+                        vmConfig = config
                     } else {
                         throw e
                     }
@@ -523,6 +543,8 @@ object VmController {
             } catch (e: VirtualMachineException) {
                 Log.w("VmController", "Failed to stop VM", e)
             }
+            vmConfig = null
+            vmConfigJson = null
             _vmState.value = VmState.Stopped
         }
     }

@@ -48,6 +48,7 @@ class GuestAgentController(
     private var vm: VirtualMachine? = null
     private var server: Server? = null
     private var debianService: DebianServiceBase? = null
+    private var koiService: IkoiService? = null
     private var clipboardController: ClipboardController? = null
     private val portsStateManager = PortsStateManager.getInstance(context)
 
@@ -98,6 +99,7 @@ class GuestAgentController(
             stop() // Safely stop existing before recreating
         }
         debianService = DebianService(context, scope, vm, guestAgent, koi_service, service)
+        koiService = koi_service
         clipboardController = ClipboardController(context, service)
         portsStateManager.registerListener(portsListener)
         updatePortsState()
@@ -127,6 +129,14 @@ class GuestAgentController(
     @Synchronized
     fun shutdownVm() {
         debianService?.shutdownDebian()
+    }
+
+    fun resizeTtyWindow(target: Int, columns: Int, rows: Int) {
+        try {
+            koiService?.resizeTtyWindow(target, columns, rows)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not share updated tty window size with koiService.")
+        }
     }
 
     fun enablePortForwarding(port: Int, enable: Boolean) {

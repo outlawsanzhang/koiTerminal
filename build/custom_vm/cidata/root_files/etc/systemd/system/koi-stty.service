@@ -1,0 +1,62 @@
+[Unit]
+Description=koiTerminal tty window resize responder
+Requires=koi-vm-manager.service
+After=koi-vm-manager.service serial-getty@ttyS0.service serial-getty@hvc0.service
+JoinsNamespaceOf=koi-namespace.service
+
+[Service]
+ExecStartPre=+/usr/bin/sh -c "/usr/bin/chmod g+rw /dev/ttyS0 /dev/hvc0 || /usr/bin/true"
+ExecStartPre=/usr/bin/sh -c "! /usr/bin/ls /dev/ttyS0 || /usr/bin/stty -F /dev/ttyS0"
+ExecStartPre=/usr/bin/sh -c "! /usr/bin/ls /dev/hvc0 || /usr/bin/stty -F /dev/hvc0"
+ExecStart=/usr/bin/sh -c "/usr/bin/python3 <(echo -e \
+\"import itertools \
+\nimport subprocess \
+\nimport sys \
+\nfor x in itertools.count(): \
+\n    with open('/tmp/linux_vm_manager/stty.pipe', 'rt') as f: \
+\n        dcr = f.readline().strip().split(',') \
+\n    if len(dcr) == 3: \
+\n        dev, cols, rows = dcr \
+\n        subprocess.check_call(['/usr/bin/stty', '-F', '/dev/hvc0' if dev == 1 else '/dev/ttyS0', 'cols', cols, 'rows', rows]) \
+\n    else: \
+\n        print('bad input (splits into', len(dcr), 'parts', file=sys.stderr) \
+\n\")"
+Restart=on-failure
+# User=nobody
+DynamicUser=yes
+Group=koi-services
+SupplementaryGroups=tty
+RestartSec=1s
+RestartSteps=8
+RestartMaxDelaySec=256s
+
+DevicePolicy=closed
+InaccessiblePaths=/run/dbus/ /run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+# PrivateDevices=yes
+# DeviceAllow does not work, though
+DeviceAllow=/dev/hvc0
+DeviceAllow=/dev/ttyS0
+PrivateIPC=yes
+PrivateNetwork=yes
+ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=

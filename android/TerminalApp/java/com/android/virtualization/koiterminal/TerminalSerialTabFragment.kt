@@ -46,6 +46,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.android.virtualization.koiterminal.CertificateUtils.createOrGetKey
 import com.android.virtualization.koiterminal.CertificateUtils.writeCertificateToFile
+import com.android.virtualization.koiterminal.new2.core.VmController
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
 import com.termux.view.TerminalView
@@ -231,6 +232,10 @@ class TerminalSerialTabFragment() : Fragment() {
         override fun onColorsChanged(session: TerminalSession) {}
 
         override fun onTerminalCursorStateChange(state: Boolean) {}
+
+        override fun onResizeTtyWindow(columns: Int, rows: Int) {
+            VmController.resizeTtyWindow(columns, rows)
+        }
 
         override fun setTerminalShellPid(session: TerminalSession, pid: Int) {}
 
