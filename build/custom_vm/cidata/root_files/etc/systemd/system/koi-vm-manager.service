@@ -1,14 +1,14 @@
 [Unit]
 Description=koiTerminal linux_vm_manager: guest agent and services
 Requires=koi-cidata.service koi-namespace.service
-Wants=koi-stty.service
+Wants=koi-date.service koi-stty.service
 After=koi-cidata.service koi-namespace.service
 Before=network.target
 JoinsNamespaceOf=koi-namespace.service
 
 [Service]
 ExecStart=/usr/bin/sh -c '/run/cidata/root_files/usr/local/bin/linux_vm_manager'
-ExecStartPre=/usr/bin/sh -c "/usr/bin/mkdir -p /tmp/linux_vm_manager && /usr/bin/chmod 770 /tmp/linux_vm_manager && ( /usr/bin/umask 007 && /usr/bin/mkfifo /tmp/linux_vm_manager/stty.pipe || /usr/bin/true ) && /usr/bin/chmod 660 /tmp/linux_vm_manager/stty.pipe"
+ExecStartPre=/usr/bin/sh -c "/usr/bin/mkdir -p /tmp/linux_vm_manager && /usr/bin/chmod 770 /tmp/linux_vm_manager && ( /usr/bin/umask 007 && /usr/bin/mkfifo /tmp/linux_vm_manager/{date,stty}.pipe || /usr/bin/true ) && /usr/bin/chmod 660 /tmp/linux_vm_manager/{date,stty}.pipe"
 Restart=on-failure
 # User=nobody
 DynamicUser=yes

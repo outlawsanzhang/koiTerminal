@@ -1,0 +1,50 @@
+[Unit]
+Description=koiTerminal date time setter
+Requires=koi-vm-manager.service
+After=koi-vm-manager.service
+Before=network.target
+JoinsNamespaceOf=koi-namespace.service
+
+[Service]
+ExecStart=/usr/bin/sh -c "/usr/bin/python3 <(echo -e \
+\"import subprocess \
+\nwith open('/tmp/linux_vm_manager/date.pipe', 'rt') as f: \
+\n    subprocess.run(['/usr/bin/date', '-s', f.readline().strip()]) \
+\n\")"
+Restart=on-failure
+RemainAfterExit=yes
+Group=koi-services
+SupplementaryGroups=tty
+RestartSec=1s
+RestartSteps=8
+RestartMaxDelaySec=256s
+
+DevicePolicy=closed
+InaccessiblePaths=/run/dbus/ /run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateIPC=yes
+PrivateNetwork=yes
+ProcSubset=pid
+# ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+# SystemCallFilter=@system-service
+SystemCallFilter=@system-service @clock
+# SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=CAP_SYS_TIME
+ReadWritePaths=

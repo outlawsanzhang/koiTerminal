@@ -31,6 +31,7 @@ import io.grpc.InsecureServerCredentials
 import io.grpc.Server
 import io.grpc.okhttp.OkHttpServerBuilder
 import java.io.IOException
+import java.util.Date
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -136,6 +137,16 @@ class GuestAgentController(
             koiService?.resizeTtyWindow(target, columns, rows)
         } catch (e: Exception) {
             Log.w(TAG, "Could not share updated tty window size with koiService.")
+        }
+    }
+
+    fun setTime() {
+        val time = Date().getTime() // to the millisecond
+        val coarseTime = time / 60000 * 60 // to the minute
+        try {
+            koiService?.setTime(coarseTime)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not share current time with koiService.")
         }
     }
 

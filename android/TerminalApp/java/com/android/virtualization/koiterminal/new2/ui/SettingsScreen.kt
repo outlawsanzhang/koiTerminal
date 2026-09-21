@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.NearbyError
 import androidx.compose.material.icons.filled.NearbyOff
 import androidx.compose.material.icons.filled.OfflineBolt
@@ -657,6 +658,8 @@ fun AdvancedPage(
     val keepAwakeMinutes by settingsViewModel.keepAwakeMinutes.collectAsStateWithLifecycle()
     val showKeepAwakeDialog by settingsViewModel.showKeepAwakeDialog.collectAsStateWithLifecycle()
 
+    val shareTime by settingsViewModel.shareTime.collectAsStateWithLifecycle()
+
     val typeToName =
         mapOf(
             GraphicsManager.AccelerationType.Lavapipe to
@@ -824,6 +827,25 @@ fun AdvancedPage(
                     Icon(imageVector = Icons.Default.Power, contentDescription = null)
                 },
                 modifier = Modifier.clickable { settingsViewModel.setShowKeepAwakeDialog(true) },
+            )
+            HorizontalDivider()
+        }
+        item {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_share_time)) },
+                supportingContent = { Text(stringResource(R.string.settings_share_time_desc)) },
+                leadingContent = {
+                    Icon(imageVector = Icons.Default.MoreTime, contentDescription = null)
+                },
+                trailingContent = {
+                    Switch(checked = shareTime, onCheckedChange = null)
+                },
+                modifier = Modifier.toggleable(
+                    value = shareTime,
+                    role = Role.Switch,
+                ) { share ->
+                    settingsViewModel.setShareTime(share)
+                },
             )
             HorizontalDivider()
         }

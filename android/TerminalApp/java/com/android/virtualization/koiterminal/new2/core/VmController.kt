@@ -17,6 +17,7 @@ package com.android.virtualization.koiterminal.new2.core
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.IBinder
@@ -337,6 +338,17 @@ object VmController {
                             }
 
                             _guestAgentController.value?.start(guestAgent, debian_service, koi_service)
+
+                            if (SettingsViewModel.shareTimePref(sharedPref)) {
+                                _guestAgentController.value?.setTime()
+                            }
+                            sharedPref.registerOnSharedPreferenceChangeListener(
+                                SharedPreferences.OnSharedPreferenceChangeListener { sharedPref, key ->
+                                    if (key == SettingsViewModel.KEY_SHARE_TIME && SettingsViewModel.shareTimePref(sharedPref)) {
+                                        _guestAgentController.value?.setTime()
+                                    }
+                                }
+                            )
 
                             Log.d(TAG, "Guest agent ready")
                         }

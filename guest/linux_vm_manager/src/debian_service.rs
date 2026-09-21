@@ -235,6 +235,7 @@ pub struct KoiService {
     // First mutex is for registering / cloning it, second mutex is for using it
     callback: Mutex<Option<SharedIkoiHostCallback>>,
     registered_ports: Mutex<BTreeMap<u16, task::JoinHandle<Result<()>>>>,
+    set_time_busy: Arc<Mutex<bool>>,
     resize_tty_busy: Arc<Mutex<bool>>,
 }
 
@@ -289,6 +290,7 @@ impl KoiService {
             rt,
             callback: Mutex::new(None),
             registered_ports: Mutex::new(BTreeMap::new()),
+            set_time_busy: Arc::new(Mutex::new(false)),
             resize_tty_busy: Arc::new(Mutex::new(false)),
         };
 
@@ -477,6 +479,11 @@ impl IkoiService for KoiService {
 
     fn supportsStorageBalloon(&self) -> BinderResult<bool> {
         Ok(false)
+    }
+
+    fn setTime(&self, epoch: i64) -> BinderResult<()> {
+        self.write_existing_pipe_if_idle("/tmp/linux_vm_manager/date.pipe", format!("@{epoch}\n"), self.set_time_busy.clone());
+        Ok(())
     }
 
     fn resizeTtyWindow(&self, target: i32, columns: i32, rows: i32) -> BinderResult<()> {

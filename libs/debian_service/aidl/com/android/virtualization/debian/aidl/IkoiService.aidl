@@ -27,5 +27,6 @@ interface IkoiService {
     void registerHostCallback(IkoiHostCallback callback) = 1;
     boolean supportsStorageBalloon() = 2;
     void openReverseConnectedPort(int vsock_port) = 3; // should block to avoid race conditions (no `oneway`)
+    void setTime(long epoch) = 4;
     void resizeTtyWindow(int target, int columns, int rows) = 5;
 }
