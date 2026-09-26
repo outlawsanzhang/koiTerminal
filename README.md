@@ -8,7 +8,7 @@ A more permissive version of the Linux Terminal app with finer VM permission con
 <img src="https://raw.githubusercontent.com/outlawsanzhang/koiTerminal/refs/heads/koiterminal/assets/secureblue-2026032000.jpg" width="50%" height="50%">
 
 The main goal is to allow users to install this as a non-system, standalone app on a non-rooted device, and run a full VM with a Linux image that is not provided by Google.
-And does not rely on Google's image for installation.
+And does not rely on Google's image to switch to a new image.
 Because, come on, there was a NestBox app by kdrag0n that was able to do this years ago! Unfortunately, it was not maintained and stopped working on newer OS versions.
 
 This app mainly tests on the latest GrapheneOS, but should work on stock for Pixels too. Support for Samsung's One UI 8.5 is provided via a [legacy branch](https://github.com/outlawsanzhang/koiTerminal/tree/koiterminal-16).

@@ -1,9 +1,15 @@
 > [!NOTE]
 > Please update to the latest app version before using newer VM images.
+> 
+> The public key that signs any VM image checksum files are embedded in the apk.
+> You can rename `VmTerminalApp.apk` to `apk.zip` and extract it, and find the pubkey under `assets/koi-vm-signing-key.asc`.
 
 # Secureblue
 The image is built according to the official recommendation (rebase from a Fedora Atomic install).
 Hats off to their very recent ARM support.
+
+:gift: Now with support for network control, Android VPN support, and port-forwarding.
+
 ### Known issues
 > [!IMPORTANT]
 > Due to kernel version issues, the default boot option will not work on some devices (such as the 8-th generation Pixels).
@@ -12,11 +18,7 @@ Hats off to their very recent ARM support.
 > 
 > Note that using the older kernel is a security degredation that introduces 1+ year (and counting) of unpatched vulnerability.
 
-1. (upstream) `ujust set-brew` [broken](https://github.com/secureblue/secureblue/issues/2098) for now
-1. Build script does not yet verify Secureblue signatures, so ghcr.io (GitHub) is currently a trusted party.
-1. Port forwarding has not been ported, but Internet should work.
-1. Automatic VM shutdown on app close has not been ported. Please shutdown within the VM after use (`run0 poweroff`).
-   If necessary, you can force a shutdown using the `Unplug` button in the bottom snackbar that pops up.
+1. Automatic VM shutdown has a terribly short timeout (5 seconds). Please shutdown within the VM after use (`run0 poweroff`).
 1. Display does not work.
 1. The web-based terminal (ttyd) has not been ported.
 1. Features requiring kernel patches (such as dynamic memory) are not ported.
@@ -25,16 +27,18 @@ Hats off to their very recent ARM support.
 1. Please follow the [post-install recommendations](https://secureblue.dev/post-install) (displayed in the terminal on first boot as well),
    especially [setting up a separate admin account](https://secureblue.dev/post-install#wheel).
 1. The automatic updates are large and may consume a lot of mobile data if not on WiFi.
-1. For your convenience, the disks are split between `secureblue-system.qcow2` and `secureblue-user.qcow2`.
+1. For your convenience, the disks are split between `secureblue-system.qcow2`, `secureblue-var.qcow2`, and `secureblue-home.qcow2`.
    It is possible to duplicate the latter and install different software on different user disks,
    potentially with some software airgapped.
+   An empty `secureblue-empty.qcow2` is provided for your convenience.
    Unfortunately, Fedora Atomic does not allow `/etc` to be a mount point during install and it has to be read-write during boot,
-   so making `-system` read-only does not work.
+   so making `-system` read-only does not work yet.
    Additionally, please note that Secureblue does not claim to provide anonymity or anti-fingerprinting benefits,
    and desktop Linux is generally bad at sandboxing.
 
 ### VM image
-- [:dvd: image](https://drive.proton.me/urls/Y02GSZFJV8#Y3AMG5zub5Wv)
+- [:dvd: image](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026091900/images.tar.gz)
+- [:lock_with_ink_pen: signature](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026091900/images.tar.gz.SHA256SUM.asc)
 - [:hammer_and_wrench: building guide](build/custom_vm/secureblue/README.md)
 
 # NixOS
