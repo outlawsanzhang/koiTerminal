@@ -28,7 +28,7 @@ cargo-ndk install cargo-ndk@4.1.2
 ```
 2. Download modified `android.jar` and set modified SDK path:
 ```
-cd koiTerminal
+cd AndroidStudioProject
 ./tools/setup.sh
 ```
 3. Build Rust components:
