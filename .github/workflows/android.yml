@@ -1,0 +1,25 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ koiterminal ]
+  pull_request:
+    branches: [ koiterminal ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: cargo-bins/cargo-binstall@c06f6a0003f7c6165a00c89d1697731c9e8a5c72 # <!-- UPDATE --> Update version
+      with:
+        version: "1.25.2"
+    - name: Build with Gradle
+      run: ./.github/scripts/build.sh
+    - name: Upload
+      uses: actions/upload-artifact@v7
+      with:
+        path: ./koiTerminal/app/build/outputs/apk/debug/app-debug.apk
+        archive: false

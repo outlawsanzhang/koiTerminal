@@ -5,3 +5,5 @@ zipfuse/target/
 Cargo.lock
 images.tar.gz
 target/
+.DS_Store
+/android/TerminalApp/jniLibs

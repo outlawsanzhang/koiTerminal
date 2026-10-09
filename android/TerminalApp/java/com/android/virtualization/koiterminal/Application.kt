@@ -19,7 +19,6 @@ import android.app.Application as AndroidApplication
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import com.android.system.virtualmachine.flags.Flags
 import com.android.virtualization.koiterminal.new2.core.Installer
 import com.android.virtualization.koiterminal.new2.core.VmController
 

@@ -433,11 +433,12 @@ fun DisplayController(viewModel: MainViewModel) {
             DisplayControllerButton(
                 checked = isExpanded,
                 onCheckedChange = {
-                    if (isFullscreen) {
-                        isExpandedLocally = !isExpandedLocally
-                    } else {
-                        viewModel.toggleDisplay()
-                    }
+                    // Display does not work right now. Avoid crashing
+                    // if (isFullscreen) {
+                    //     isExpandedLocally = !isExpandedLocally
+                    // } else {
+                    //     viewModel.toggleDisplay()
+                    // }
                 },
                 pressedIcon = Icons.Filled.Close,
                 unpressedIcon = Icons.Outlined.Monitor,

@@ -1,4 +1,44 @@
 # How to build koiTerminal
+Thanks to @zhuowei, koiTerminal can now be built with Android Studio for quicker development.
+
+The manual releases will still be built with the OS to remain a soft fork of the upstream Linux Terminal app.
+But automatic releases will be built using the Android Studio setup by GitHub Actions.
+
+# Android Studio build
+1. Install:
+  - Android Platform 37.0, Build Tools 36.0.0, NDK
+  - Rust
+  - Rust Android targets
+  - cargo-ndk
+```
+# Example:
+cd ~/Downloads
+# Android Studio
+wget https://edgedl.me.gvt1.com/android/studio/ide-zips/2026.2.1.8/android-studio-rabbit1-linux.tar.gz # Link found at: https://developer.android.com/studio
+tar xzf android-studio-rabbit1-linux.tar.gz
+echo "Please setup [SDK Platforms > Android 17.0 (API level 37.0)] and [SDK Tools > NDK (Side by side)]"
+android-studio/bin/studio
+# Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup.sh
+sh rustup.sh
+# Rust Android targets
+rustup target add aarch64-linux-android x86_64-linux-android
+# cargo-ndk
+cargo-ndk install cargo-ndk@4.1.2
+```
+2. Download modified `android.jar` and set modified SDK path:
+```
+cd koiTerminal
+./tools/setup.sh
+```
+3. Build Rust components:
+```
+./tools/build_rust.sh
+```
+4. (optional) Build in Android Studio (Build > Generate App Bundles or APKs > Generate APKs)
+5. Build signed app in Android Studio (Build > Generate Signed App Bundle or APK > APK > (set up signing keys) > release)
+
+# Building koiTerminal with the OS
 ### Build the OS first
 The upstream app is designed to be a component of AOSP, and leverages system APIs such as `android.system.virtualmachine.VirtualMachineManager`.
 Therefore, it seems that this app cannot be built normally and has to be built with the OS build system.

@@ -20,7 +20,6 @@ import android.content.Intent
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import com.android.system.virtualmachine.flags.Flags
 import com.android.virtualization.koiterminal.new2.ui.MainActivity as NewUiMainActivity
 import java.nio.file.Files
 

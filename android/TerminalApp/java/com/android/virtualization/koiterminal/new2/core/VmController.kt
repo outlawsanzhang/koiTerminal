@@ -32,7 +32,6 @@ import android.system.virtualmachine.VirtualMachineCustomImageConfig
 import android.system.virtualmachine.VirtualMachineException
 import android.system.virtualmachine.VirtualMachineManager
 import android.util.Log
-import com.android.system.virtualmachine.flags.Flags
 import com.android.virtualization.debian.aidl.IDebianService
 import com.android.virtualization.debian.aidl.IkoiService
 import com.android.virtualization.koiterminal.AndroidToVmBridge
@@ -541,8 +540,7 @@ object VmController {
     private fun canUseTtydOverVsock(): Boolean {
         val buildId = InstalledImage.getDefault(context).buildInfo?.buildId ?: 0
         val FIRST_VERSION_SUPPORTS_TTYD_VSOCK = 5106
-        return Flags.terminalVmCommunicationRefactoring() &&
-            buildId >= FIRST_VERSION_SUPPORTS_TTYD_VSOCK
+        return buildId >= FIRST_VERSION_SUPPORTS_TTYD_VSOCK
     }
 
     fun stop() {

@@ -38,7 +38,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import libcore.io.Streams
 
 /**
  * Forwards VM's console output to a file on the Android side, and VM's log output to Android logd.

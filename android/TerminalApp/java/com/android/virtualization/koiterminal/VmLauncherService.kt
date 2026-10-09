@@ -41,7 +41,6 @@ import android.system.virtualmachine.VirtualMachineCustomImageConfig.AudioConfig
 import android.system.virtualmachine.VirtualMachineException
 import android.util.Log
 import androidx.annotation.WorkerThread
-import com.android.system.virtualmachine.flags.Flags
 import com.android.virtualization.koiterminal.InstalledImage.Companion.roundUp
 import com.android.virtualization.koiterminal.MainActivity.Companion.PREFIX
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
@@ -323,8 +322,7 @@ class VmLauncherService : Service() {
     private fun canUseTtydOverVsock(): Boolean {
         val buildId = InstalledImage.getDefault(this).buildInfo?.buildId ?: 0
         val FIRST_VERSION_SUPPORTS_TTYD_VSOCK = 5106
-        return Flags.terminalVmCommunicationRefactoring() &&
-            buildId >= FIRST_VERSION_SUPPORTS_TTYD_VSOCK
+        return buildId >= FIRST_VERSION_SUPPORTS_TTYD_VSOCK
     }
 
     private fun notifyIfSerialAvailable(resultReceiver: ResultReceiver?) {

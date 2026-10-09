@@ -66,7 +66,7 @@ It will have to be reworked before koiTerminal can use it.
 Modifying an image downloaded from Google is deprecated.
 
 ### Known issues
-1. On the first boot, the serial terminal takes a while until it allows logging in, about one minute after the web-based terminal is ready.
+1. On the first boot, the serial terminal takes a while until it allows logging in, about one minute after the web-based terminal is ready. The login prompt needs to be restarted by pressing Ctrl+D.
 1. Kernel logs can appear on the serial console and make a mess. This mostly happens during the first minute after log in.
 
 ### VM image

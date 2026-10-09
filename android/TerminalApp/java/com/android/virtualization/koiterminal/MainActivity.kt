@@ -50,7 +50,6 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.activity.viewModels
 import androidx.viewpager2.widget.ViewPager2
 import com.android.internal.annotations.VisibleForTesting
-import com.android.microdroid.test.common.DeviceProperties
 import com.android.virtualization.koiterminal.BetterBugLauncher.Companion.launchBetterBugActivity
 import com.android.virtualization.koiterminal.ErrorActivity.Companion.start
 import com.android.virtualization.koiterminal.VmLauncherService.VmLauncherServiceCallback
@@ -544,16 +543,7 @@ public class MainActivity :
         private const val FONT_SIZE_DEFAULT = 13
 
         init {
-            val prop =
-                DeviceProperties.create(
-                    DeviceProperties.PropertyGetter { key: String -> SystemProperties.get(key) }
-                )
-            TERMINAL_CONNECTION_TIMEOUT_MS =
-                if (prop.isCuttlefish() || prop.isGoldfish()) {
-                    180000 // 3 minutes
-                } else {
-                    20000 // 20 sec
-                }
+            TERMINAL_CONNECTION_TIMEOUT_MS = 180000 // 3 minutes for everyone
         }
     }
 

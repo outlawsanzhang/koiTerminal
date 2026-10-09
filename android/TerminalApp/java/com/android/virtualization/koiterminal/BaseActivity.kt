@@ -18,7 +18,6 @@ package com.android.virtualization.koiterminal
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.permission.flags.Flags
 import androidx.appcompat.app.AppCompatActivity
 
 abstract class BaseActivity : AppCompatActivity() {
@@ -43,7 +42,7 @@ abstract class BaseActivity : AppCompatActivity() {
         }
 
         // Check for ACCESS_LOCAL_NETWORK permission if the flag is enabled
-        if (Flags.accessLocalNetworkPermissionEnabled()) {
+        if (true) {
             if (
                 applicationContext.checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) !=
                     PackageManager.PERMISSION_GRANTED

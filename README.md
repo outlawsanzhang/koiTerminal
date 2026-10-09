@@ -47,7 +47,7 @@ Once this repo is in a more presentable state (>=3 distros successfully supporte
     - Booting from installation media using u-boot (instructions to come) <!-- UPDATE -->
 
 ## Disclaimers
-- Proof-of-concept pre-alpha test-build software, provided AS-IS. Beware of sharp edges, and back up often. You have been warned.
+- Proof-of-concept alpha test-build software, provided AS-IS. Beware of sharp edges, and back up often. You have been warned.
 - The app is only tested on newer devices running the latest GrapheneOS (and One UI 8.5 at one point), so it would be nice to know if it works for other OSes.
   Many Android-based OSes and devices do not support Android Virtualization Framework, and may not be based on the latest version of AOSP.
   The support may feel arbitrary. For example, it appears that Samsung's Galaxy Tab S10 FE supports AVF, but S10 Lite probably does not.
@@ -83,6 +83,17 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X]  (stretch) Experimental: Enable forcing the VM to use the host vpn
     - Supported by disabling network and including a managed SOCKS5 proxy
     - [X] Provide option to control network, SOCKS5, loopback, local network, etc.
+- [ ] Merge PR
+    - [X] Patch review
+    - [X] Patch apply
+    - [X] Double check after patch apply that gradlew, jar etc. are identical to Android Studio version using fresh install
+    - [X] Double check versions
+    - [X] Apply as merge
+    - [X] Copy over .git/, checkout, and try building
+    - [X] Refine .gitignore
+    - [X] How to build for another apk name
+    - [ ] Document Android Studio build in BUILD.md
+    - [ ] Version, version code
 - [ ] Fix Secureblue image
     - [X] Support port-forwarding and network proxies out-of-the-box
     - [ ] Add support for display.
@@ -145,11 +156,11 @@ adb shell pm list users # owner's ID is 0, others' can be obtained here
 adb shell pm grant --user ?? com.android.virtualization.koiterminal android.permission.MANAGE_VIRTUAL_MACHINE # fill in the user ID
 adb shell pm grant --user ?? com.android.virtualization.koiterminal android.permission.USE_CUSTOM_VIRTUAL_MACHINE # fill in the user ID
 
-# Note: the command below grants ALL APPS access to hidden API that match `android.system.virtualmachine.VirtualMachine*`.
-# There are quite a few matching classes. If you are not comfortable with this, a more granular grant could be:
+# Note: the command below grants ALL APPS access to hidden API that match `android.system.virtualmachine.VirtualMachineC*`.
+# There are three matching classes but only two are used. If you are not comfortable with this, a more granular grant could be:
 #    adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/virtualmachine/VirtualMachineCustomImageConfig\$,Landroid/system/virtualmachine/VirtualMachineCustomImageConfig;,Landroid/system/virtualmachine/VirtualMachineConfig\$Builder;,Landroid/system/virtualmachine/VirtualMachineConfig;'"
 # To remove this grant, use `adb shell settings delete global hidden_api_blacklist_exemptions`
-adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/virtualmachine/VirtualMachine'"
+adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/virtualmachine/VirtualMachineC'"
 
 # Don't forget to turn off USB/wireless debugging (and probably developer options too) afterwards.
 ```

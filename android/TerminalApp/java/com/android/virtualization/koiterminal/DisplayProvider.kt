@@ -21,7 +21,7 @@ import android.os.DeadObjectException
 import android.os.ParcelFileDescriptor
 import android.os.RemoteException
 import android.os.ServiceManager
-import android.system.virtualizationservice_internal.IVirtualizationServiceInternal
+// import android.system.virtualizationservice_internal.IVirtualizationServiceInternal // This is privileged API
 import android.util.Log
 import android.view.SurfaceControl
 import android.view.SurfaceHolder
@@ -49,9 +49,10 @@ internal class DisplayProvider(
     private var cursorHandler: CursorHandler? = null
     private val displayService: ICrosvmAndroidDisplayService by lazy {
         val b = ServiceManager.waitForService("android.system.virtualizationservice")
-        val virtService = IVirtualizationServiceInternal.Stub.asInterface(b)
-        val b2 = virtService.waitDisplayService()
-        ICrosvmAndroidDisplayService.Stub.asInterface(b2)
+        // val virtService = IVirtualizationServiceInternal.Stub.asInterface(b)
+        // val b2 = virtService.waitDisplayService()
+        // ICrosvmAndroidDisplayService.Stub.asInterface(b2)
+        ICrosvmAndroidDisplayService.Stub.asInterface(b) // will crash anyway
     }
 
     private var currentResolution = initialResolution
