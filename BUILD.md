@@ -1,8 +1,8 @@
 # How to build koiTerminal
-Thanks to @zhuowei, koiTerminal can now be built with Android Studio for quicker development.
+Thanks to [@zhuowei](https://github.com/zhuowei), koiTerminal can now be built with Android Studio for quicker development.
 
-The manual releases will still be built with the OS to remain a soft fork of the upstream Linux Terminal app.
-But automatic releases will be built using the Android Studio setup by GitHub Actions.
+The manual releases will still be built with the OS so that koiTerminal remains a soft fork of the upstream Linux Terminal app.
+But automatic build artifacts will be built using the Android Studio setup by GitHub Actions (with a separate application ID + signature).
 
 # Android Studio build
 1. Install:

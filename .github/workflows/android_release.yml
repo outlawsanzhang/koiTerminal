@@ -1,0 +1,33 @@
+name: Android release CI
+
+on:
+  push:
+    branches: [ koiterminal ]
+    paths:
+      - "AndroidStudioProject/app/build.gradle.kts"
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: cargo-bins/cargo-binstall@c06f6a0003f7c6165a00c89d1697731c9e8a5c72 # <!-- UPDATE --> Update version
+      with:
+        version: "1.25.2"
+    - name: Build with Gradle
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: |
+        source ./.github/scripts/build-common.sh
+        echo "$KEYSTORE_BASE64" | base64 --decode > ./keystore.jks
+        ./gradlew :app:assembleRelease
+    - name: Upload
+      uses: actions/upload-artifact@v7
+      with:
+        path: ./AndroidStudioProject/app/build/outputs/apk/release/app-release.apk
+        archive: false

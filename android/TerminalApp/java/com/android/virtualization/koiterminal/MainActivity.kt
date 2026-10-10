@@ -537,6 +537,7 @@ public class MainActivity :
 
     companion object {
         const val TAG: String = "VmTerminalApp"
+        // OK to use `android.vir...koiterminal` instead of packageName since explicit intent actions can be arbitrary string
         const val PREFIX: String = "com.android.virtualization.koiterminal."
         private val TERMINAL_CONNECTION_TIMEOUT_MS: Int
         private const val REQUEST_CODE_INSTALLER = 0x33

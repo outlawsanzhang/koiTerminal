@@ -22,12 +22,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val keystore = rootProject.file("keystore.jks")
+    if (keystore.exists()) {
+        signingConfigs {
+            create("release") {
+                storeFile = keystore
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             optimization {
-                enable = false
-                // enable = true
-                // packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                enable = true
+                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+            }
+            if (keystore.exists()) {
+                signingConfig = signingConfigs["release"]
             }
         }
     }
@@ -43,7 +57,6 @@ android {
 
 dependencies {
     implementation(project(":libs_debian_service"))
-    // implementation(project(":tests_libs_common"))
     implementation(project(":libs_android_display_backend"))
     implementation(project(":android_virtualizationservice_aidl"))
     implementation(project(":koiterminal-stubs"))

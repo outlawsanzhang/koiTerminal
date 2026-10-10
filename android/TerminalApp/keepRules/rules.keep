@@ -1,0 +1,4 @@
+-dontwarn android.os.ShellCommand
+-dontwarn com.android.modules.utils.TypedXmlPullParser
+-dontwarn com.android.modules.utils.TypedXmlSerializer
+-keep class kotlin.sequences.* # Why is this even needed

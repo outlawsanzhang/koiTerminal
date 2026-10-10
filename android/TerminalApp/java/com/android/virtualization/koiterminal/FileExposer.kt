@@ -51,7 +51,7 @@ class FileExposer : DocumentsProvider() {
         // const val ROOT_FILES_DOCUMENT_ID = "ROOTDIR_FILES"
         const val BIN_TYPE = "application/octet-stream"
         const val TAG: String = "VmTerminalApp.FileExposer"
-        const val AUTHORITY = "com.android.virtualization.koiterminal.documents"
+        const val DEFAULT_APPID = "com.android.virtualization.koiterminal"
     }
     
     @UiThread
@@ -82,7 +82,7 @@ class FileExposer : DocumentsProvider() {
     }
 
     fun buildUri(documentId: String): Uri {
-        return DocumentsContract.buildChildDocumentsUri(AUTHORITY, documentId)
+        return DocumentsContract.buildChildDocumentsUri((context?.packageName ?: DEFAULT_APPID) + ".documents", documentId)
     }
 
     fun documentIdToParent(documentId: String): String {

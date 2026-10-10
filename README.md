@@ -1,5 +1,5 @@
 # koiTerminal
-A more permissive version of the Linux Terminal app with finer VM permission control, forked from the GrapheneOS repo, supporting custom virtual machine images (such as Secureblue). Currently in proof-of-concept stage. <!-- UPDATE -->
+A more permissive version of the Linux Terminal app with finer VM permission control, forked from the GrapheneOS repo, supporting custom virtual machine images (such as Secureblue). Currently in alpha stage. <!-- UPDATE -->
 
 > [!IMPORTANT]
 > For GrapheneOS users, new restrictions since around 2026070500 require additional `adb` permission grants. Please search the [How to use](#how-to-use) section for `hidden_api`.
@@ -164,6 +164,7 @@ adb shell "settings put global hidden_api_blacklist_exemptions 'Landroid/system/
 
 # Don't forget to turn off USB/wireless debugging (and probably developer options too) afterwards.
 ```
+Note that if you installed the GitHub Action auto-built apk, you need to replace `com.android.virtualization.koiterminal` with `com.android.virtualization.koiterminal.githubaction`.
 
 For One UI, the above should work too. If it does not, please open an issue.
 You can temporarily use the following alternative that grants ALL APPS a broad range of API usage,

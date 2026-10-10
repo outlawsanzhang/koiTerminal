@@ -24,7 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "koiTerminal"
 include(":app")
-// include(":tests_libs_common")
 include(":libs_debian_service")
 include(":koiterminal-stubs")
 include(":libs_android_display_backend")

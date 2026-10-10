@@ -5,4 +5,3 @@ cargo binstall cargo-ndk@4.1.2 # <!-- UPDATE --> Update version
 cd AndroidStudioProject
 ./tools/setup.sh
 ./tools/build_rust.sh
-./gradlew :app:assembleDebug

@@ -79,7 +79,7 @@ class BetterBugLauncher {
             return null
         }
 
-        return FileProvider.getUriForFile(context, FILE_PROVIDER_AUTHORITY, logZipFilePath.toFile())
+        return FileProvider.getUriForFile(context, context.packageName + FILE_PROVIDER_AUTHORITY, logZipFilePath.toFile())
     }
 
     @WorkerThread
@@ -126,7 +126,7 @@ class BetterBugLauncher {
 
         // Defined in AndroidManifest.xml
         private const val FILE_PROVIDER_AUTHORITY =
-            "com.android.virtualization.koiterminal.fileprovider"
+            ".fileprovider"
         private const val LOG_ZIP_DIR = "bugreport"
 
         // From go/betterbug-integration

@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        // OK to use `android.vir...koiterminal` instead of packageName since explicit intent actions can be arbitrary string
         const val ACTION_OPEN_SETTINGS_PORT =
             "android.virtualization.koiterminal.action.OPEN_SETTINGS_PORT"
         const val ACTION_OPEN_SETTINGS_KEEP_AWAKE =
