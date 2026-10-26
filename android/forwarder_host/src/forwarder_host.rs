@@ -303,10 +303,7 @@ impl RcSocks5Proxy {
         Ok(())
     }
 
-    // FIXME: Not blocking if AsyncBorrowedFdStream becomes actually non-blocking
-    async fn run_new_connection_blocking(fd: RawFd, setup: Arc<Socks5Setup>) -> SocksResult<()> {
-        // Safety: only other operation is closing the vsock, which happens outside the scope of `stream`
-        let stream = unsafe { AsyncBorrowedFdStream::new(&fd) }?;
+    async fn run_new_connection(stream: AsyncBorrowedFdStream, setup: Arc<Socks5Setup>) -> SocksResult<()> {
         // Authentication not needed since there is no exposed port. All connection via vsock as file descriptors
         let (proto, cmd, target_addr) = Socks5ServerProtocol::accept_no_auth(stream)
             .await.inspect_err(|e| error!("fast-socks5 new connection accept error: {e}"))?
@@ -345,8 +342,8 @@ impl ReverseConnectedService for RcSocks5Proxy {
         self.vsock_port
     }
 
-    // FIXME: TcpStream::connect is blocking.
     fn on_new_connection(&mut self, fd: RawFd) -> Result<Option<ForwarderSession>> {
+        let rt = self.rt.clone();
         let setup = self.setup.clone();
         // Delegated proxy:
         if setup.delegated != 0 {
@@ -362,8 +359,9 @@ impl ReverseConnectedService for RcSocks5Proxy {
         // file descriptor set non-blocking and query buffer emptiness
         // FIXME: Not blocking if AsyncBorrowedFdStream becomes actually non-blocking
         self.rt.spawn_blocking(move || {
+            let mut vsock_stream = unsafe { AsyncBorrowedFdStream::new(&fd, rt, true) };
             let result = tokio::runtime::Handle::current().block_on(
-                Self::run_new_connection_blocking(fd, setup)
+                Self::run_new_connection_blocking(vsock_stream, setup)
             );
             let mut revdisc_queue = REVDISC_QUEUE.lock().unwrap();
             revdisc_queue.push_back(fd);
@@ -607,9 +605,27 @@ impl<'a> ForwarderSessions<'a> {
         hostDisconnectVsock(&mut self.jni_env, &self.jni_cb, fd)
     }
 
-    // FIXME: it feels that upstream implemented this in a way that, if the VM is very slow in either
+    // FIXME: as of Android 17 (no QPR), upstream implemented this in a way that, if the VM is very slow in either
     //     accepting connections or reading what this writes, then this function would be blocked
     //     on processing just one event, and the rest gets queued up until it unblocks.
+    //     An easy proof-of-concept is, on vanilla Terminal app,
+    //         dd if=/dev/random of=~/server/random bs=1024 count=102400 # prepare a 100MB random file for download
+    //         python3 -m http.server 8080
+    //     And allow port forwarding for port 8080. Open browser and load localhost:8080, and a directory listing
+    //     of ~/server in the VM will show, and you can download the random file at this point.
+    //     Then on Termux, install python, and in python, run
+    //         import time
+    //         import socket
+    //         s = socket.socket()
+    //         s.connect(("127.0.0.1", 8080)) # connect to the VM's python http server via port-forwarding
+    //         s.send(b"GET /random HTTP/1.1\r\nHost: localhost:8080\r\nUser-Agent: curl/8.18.0\r\nAccept: */*\r\n\r\n")
+    //         print(s.recv(1024)) # Download only 1KB of the 100MB random file and let the stream hang
+    //         time.sleep(3600) # Let it sit for an hour
+    //     When python is sleeping, you will find that the browser is no longer able to reload localhost:8080 or
+    //     download the random file.
+    //     Quit/kill python and the browser will be able to load again.
+    // 
+    //     Anyway, good luck running anything multithreaded with it. I'm gonna refactor it with tokio.
     fn run(mut self) -> Result<()> {
         let poll_ctx: PollContext<Token> = PollContext::new().map_err(Error::PollContextNew)?;
         poll_ctx.add(&*UPDATE_EVT, Token::UpdatePorts).map_err(Error::PollContextAdd)?;

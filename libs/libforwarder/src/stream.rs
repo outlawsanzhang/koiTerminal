@@ -20,11 +20,11 @@
 use std::fmt;
 use std::io;
 use std::net::TcpStream;
-use std::os::fd::BorrowedFd;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::pin::Pin;
-use std::task::{Context, Poll, ready};
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
 use std::result;
 use crate::forwarder::MAX_FRAME_SIZE;
 
@@ -32,7 +32,8 @@ use libc::{self, c_void, shutdown, EPIPE, SHUT_WR};
 #[cfg(debug_assertions)]
 use log::debug;
 use log::{info, error};
-use tokio::{io::{AsyncRead, AsyncWrite, ReadBuf, unix::AsyncFd}, task};
+use tokio::{io::{AsyncRead, AsyncWrite, ReadBuf}, task};
+use tokio::runtime::Runtime;
 use vsock::VsockAddr;
 use vsock::VsockStream;
 
@@ -205,24 +206,42 @@ pub enum StreamSocketError {
 /// Implement tokio-compatible async operations for file descriptors owned by others.
 /// Refrains from closing the fd, but can shutdown writes.
 /// (mainly vsock, either from vm.connectVsock() or vsock::*)
-pub struct AsyncBorrowedFdStream<'a> {
-    fd: AsyncFd<BorrowedFd<'a>>,
-    shut_down: bool,
+pub struct AsyncBorrowedFdStream {
+    fd: RawFd,
+    read_lock: Arc<Mutex<(Option<io::Result<usize>>, [u8; MAX_FRAME_SIZE], usize)>>, // read result, read buffer, buffer offset
+    read_wakers: Arc<Mutex<Vec<Waker>>>,
+    write_lock: Arc<Mutex<(Option<io::Result<()>>, [u8; MAX_FRAME_SIZE], usize, bool)>>, // write result, write buffer, write buffer length, shut_down
+    write_wakers: Arc<Mutex<Vec<Waker>>>, // write, flush
+    shutdown_lock: Arc<Mutex<Option<io::Result<()>>>>, // write result, write buffer, write buffer length, shut_down
+    shutdown_wakers: Arc<Mutex<Vec<Waker>>>,
+    rt: Arc<Runtime>,
+    shut_down: Mutex<bool>,
+    skips_shut_down: bool,
 }
 
-impl<'a> AsyncBorrowedFdStream<'a> {
+impl AsyncBorrowedFdStream {
     /// Creates from anything that gives you a raw fd.
     /// # Safety
     /// Safe if during my lifetime fd is not read by others when I read,
     /// or written to / shut down by others when I write to it / shut it down.
-    pub unsafe fn new<T: AsRawFd>(fd: &T) -> io::Result<Self> {
-        let fd = fd.as_raw_fd();
+    pub unsafe fn new<T: AsRawFd>(fd: &T, rt: Arc<Runtime>, skips_shut_down: bool) -> Self {
         // Safety: safe if fd is not operated on by others during my lifetime
-        let fd = AsyncFd::new(unsafe {
-            let result = BorrowedFd::borrow_raw(fd);
-            result
-        }).inspect_err(|e| error!("AsyncBorrowedFdStream: AsyncFd::new() error {e}"))?;
-        Ok(Self { fd, shut_down: false })
+        let fd = fd.as_raw_fd();
+        let result = Self {
+            fd,
+            read_lock: Arc::new(Mutex::new((None, [0u8; MAX_FRAME_SIZE], 0usize))), // start = not ready to read
+            read_wakers: Arc::new(Mutex::new(Vec::new())),
+            write_lock: Arc::new(Mutex::new((Some(Ok(())), [0u8; MAX_FRAME_SIZE], 0usize, false))), // start = ready to write
+            write_wakers: Arc::new(Mutex::new(Vec::new())),
+            shutdown_lock: Arc::new(Mutex::new(None)), // start = ready to shut down
+            shutdown_wakers: Arc::new(Mutex::new(Vec::new())),
+            rt: rt.clone(),
+            shut_down: Mutex::new(false),
+            skips_shut_down,
+        };
+        result.read_in_bg();
+        info!("AsyncBorrowedFdStream: Launched new stream fd={fd}; total tasks {}", rt.metrics().num_alive_tasks());
+        result
     }
 
     /// Helper to print bytes sent/received
@@ -238,7 +257,7 @@ impl<'a> AsyncBorrowedFdStream<'a> {
     }
 
     /// Shutdown write
-    pub fn raw_shutdown(fd: RawFd, shut_down: &mut bool) -> io::Result<()> {
+    pub fn raw_shutdown(fd: RawFd) -> io::Result<()> {
         // SAFETY:
         // Safe because no memory is modified and the return value is checked.
         let ret = unsafe { shutdown(fd, SHUT_WR) };
@@ -246,7 +265,6 @@ impl<'a> AsyncBorrowedFdStream<'a> {
             info!("AsyncBorrowedFdStream: shutdown error ret={ret}");
             return Err(io::Error::last_os_error());
         }
-        *shut_down = true;
         Ok(())
     }
 
@@ -269,7 +287,8 @@ impl<'a> AsyncBorrowedFdStream<'a> {
     }
 
     /// Helper to write to raw fd. Copied from StreamSocket
-    fn raw_write(fd: RawFd, buf: &[u8], shut_down: &mut bool) -> io::Result<usize> {
+    fn raw_write(fd: RawFd, buf: &[u8]) -> (io::Result<usize>, bool) {
+        let mut shut_down = false;
         // SAFETY:
         // Safe because this doesn't modify any memory and we check the return value.
         let ret = unsafe { libc::write(fd, buf.as_ptr() as *const c_void, buf.len()) };
@@ -278,105 +297,374 @@ impl<'a> AsyncBorrowedFdStream<'a> {
             let err = io::Error::last_os_error();
             if let Some(errno) = err.raw_os_error() {
                 if errno == EPIPE {
-                    *shut_down = true;
+                    shut_down = true;
                 }
                 info!("AsyncBorrowedFdStream: forwarding raw_write os errorno {errno}, inside:");
             }
             info!("AsyncBorrowedFdStream: forwarding raw_write error {err}");
-            return Err(err);
+            return (Err(err), shut_down);
         }
         #[cfg(debug_assertions)]
         debug!("AsyncBorrowedFdStream: forwarding raw_write ({ret}) {}", Self::to_hex_or_http_string(buf, ret));
-        Ok(ret as usize)
+        (Ok(ret as usize), shut_down)
     }
 
     /// Helper for write_all. Copied from std::io.
-    fn raw_write_all(fd: RawFd, mut buf: &[u8], shut_down: &mut bool) -> io::Result<()> {
+    fn raw_write_all(fd: RawFd, buf: &[u8]) -> (io::Result<()>, bool) {
+        let mut shut_down = false;
+        let mut buf = buf;
         while !buf.is_empty() {
-            match Self::raw_write(fd, buf, shut_down) {
+            let (result, sd) = Self::raw_write(fd, buf);
+            shut_down |= sd;
+            match result {
                 Ok(0) => {
-                    *shut_down = true;
-                    return Ok(());
+                    shut_down = true;
+                    return (Ok(()), shut_down);
                 }
                 Ok(n) => buf = &buf[n..],
                 // Err(ref e) if e.is_interrupted() => {} // no access, we can just crash
-                Err(e) => return Err(e),
+                Err(e) => return (Err(e), shut_down),
             }
         }
-        Ok(())
+        (Ok(()), shut_down)
+    }
+
+    /// Helper for reading in background
+    fn read_in_bg(&self) {
+        let fd = self.fd;
+        #[cfg(debug_assertions)]
+        debug!("AsyncBorrowedFdStream: fd={fd} launching next read_in_bg");
+        let read_lock = self.read_lock.clone();
+        let wakers = self.read_wakers.clone();
+        self.rt.spawn_blocking(move || {
+            #[cfg(debug_assertions)]
+            debug!("AsyncBorrowedFdStream: fd={fd} read_in_bg");
+            let mut result0_buf1_off2 = read_lock.lock().unwrap();
+            if result0_buf1_off2.0.is_none() {
+                // read in background; IO is blocking
+                result0_buf1_off2.0 = Some(Self::raw_read(fd, &mut result0_buf1_off2.1));
+                result0_buf1_off2.2 = 0usize;
+                let mut wakers = wakers.lock().unwrap();
+                wakers.drain(..).for_each(|w| w.wake());
+                // Drop wakers last, and let fg lock wakers first.
+                // This guarantees that if fg locks wakers but fails to lock buffer (and assumes that bg is IO-blocked),
+                // the bg work is actually IO-blocked (and therefore the wakers it passes to bg WILL be checked)
+                // instead of being in the teardown process (passed wakers will be ignored).
+                #[cfg(debug_assertions)]
+                debug!("AsyncBorrowedFdStream: fd={fd} read_in_bg done ({:?}), dropping locks", result0_buf1_off2.0);
+                std::mem::drop(result0_buf1_off2);
+                std::mem::drop(wakers);
+            }
+        });
+    }
+
+    /// Helper for writing in background
+    fn write_in_bg(&self) {
+        let fd = self.fd;
+        #[cfg(debug_assertions)]
+        debug!("AsyncBorrowedFdStream: fd={fd} launching next write_in_bg");
+        let write_lock = self.write_lock.clone();
+        let wakers = self.write_wakers.clone();
+        self.rt.spawn_blocking(move || {
+            #[cfg(debug_assertions)]
+            debug!("AsyncBorrowedFdStream: fd={fd} write_in_bg");
+            let mut result0_buf1_len2_sd3 = write_lock.lock().unwrap();
+            if result0_buf1_len2_sd3.0.is_none() { // if there are things to write
+                let write_result = Self::raw_write_all(fd, &result0_buf1_len2_sd3.1[..result0_buf1_len2_sd3.2]);
+                (result0_buf1_len2_sd3.0, result0_buf1_len2_sd3.3) = (Some(write_result.0), write_result.1);
+                let mut wakers = wakers.lock().unwrap();
+                wakers.drain(..).for_each(|w| w.wake());
+                // Drop wakers last, and let fg lock wakers first.
+                // This guarantees that if fg locks wakers but fails to lock buffer (and assumes that bg is IO-blocked),
+                // the bg work is actually IO-blocked (and therefore the wakers it passes to bg WILL be checked)
+                // instead of being in the teardown process (passed wakers will be ignored).
+                #[cfg(debug_assertions)]
+                debug!("AsyncBorrowedFdStream: fd={fd} write_in_bg done ({:?}), dropping locks", result0_buf1_len2_sd3.0);
+                std::mem::drop(result0_buf1_len2_sd3);
+                std::mem::drop(wakers);
+            }
+        });
+    }
+
+    /// Helper for shutting down in background
+    fn shutdown_in_bg(&self) {
+        let fd = self.fd;
+        if *self.shut_down.lock().unwrap() {
+            info!("AsyncBorrowedFdStream: fd={fd} skipping shutdown_in_bg: already shut down");
+            return;
+        }
+        #[cfg(debug_assertions)]
+        debug!("AsyncBorrowedFdStream: fd={fd} launching shutdown_in_bg");
+        let shutdown_lock = self.shutdown_lock.clone();
+        let wakers = self.shutdown_wakers.clone();
+        self.rt.spawn_blocking(move || {
+            #[cfg(debug_assertions)]
+            debug!("AsyncBorrowedFdStream: fd={fd} shutdown_in_bg");
+            let mut result = shutdown_lock.lock().unwrap();
+            if result.is_none() { // if shutdown not performed
+                *result = Some(Self::raw_shutdown(fd));
+                let mut wakers = wakers.lock().unwrap();
+                wakers.drain(..).for_each(|w| w.wake());
+                // Drop wakers last, and let fg lock wakers first.
+                // This guarantees that if fg locks wakers but fails to lock buffer (and assumes that bg is IO-blocked),
+                // the bg work is actually IO-blocked (and therefore the wakers it passes to bg WILL be checked)
+                // instead of being in the teardown process (passed wakers will be ignored).
+                #[cfg(debug_assertions)]
+                debug!("AsyncBorrowedFdStream: fd={fd} shutdown_in_bg done ({:?}), dropping locks", *result);
+                std::mem::drop(result);
+                std::mem::drop(wakers);
+            }
+        });
     }
 }
 
-/// This is mostly copied from https://docs.rs/tokio/latest/tokio/io/unix/struct.AsyncFd.html, and its license is MIT
-impl<'a> AsyncRead for AsyncBorrowedFdStream<'a> {
+/// This is refactored from https://docs.rs/tokio/latest/tokio/io/unix/struct.AsyncFd.html, and its license is MIT
+impl AsyncRead for AsyncBorrowedFdStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>
     ) -> Poll<io::Result<()>> {
-        loop {
-            let mut guard = ready!({
-                self.fd.poll_read_ready(cx)
-            })?;
-
-            let unfilled = buf.initialize_unfilled();
-            match guard.try_io(|inner| Self::raw_read(inner.as_raw_fd(), unfilled)) {
-                Ok(Ok(len)) => {
-                    buf.advance(len);
-                    return Poll::Ready(Ok(()));
-                },
-                Ok(Err(err)) => {
-                    info!("AsyncBorrowedFdStream: forwarding poll_read Ok(Err({err}))");
-                    return Poll::Ready(Err(err));
-                },
-                Err(_would_block) => {
-                    continue;
-                },
-            }
+        let fd = self.fd;
+        #[cfg(debug_assertions)]
+        debug!("AsyncBorrowedFdStream: fd={fd} poll_read");
+        // Lock wakers first. See comment in read_in_bg for rationale.
+        let mut wakers = self.read_wakers.lock().unwrap();
+        match self.read_lock.try_lock() {
+            Ok(ref mut result0_buf1_off2) => {
+                match result0_buf1_off2.0 {
+                    // Read done and ready
+                    Some(Ok(len)) => {
+                        let off = result0_buf1_off2.2;
+                        let remain = buf.remaining();
+                        if remain < len {
+                            // need to chunk it
+                            assert!(off + len <= MAX_FRAME_SIZE, "Offset / read / MAX_FRAME_SIZE out of bound: {off} / {len} / {MAX_FRAME_SIZE}");
+                            buf.put_slice(&result0_buf1_off2.1[off..off+remain]);
+                            result0_buf1_off2.0 = Some(Ok(len - remain));
+                            result0_buf1_off2.2 = off + remain;
+                        } else {
+                            // consume all
+                            buf.put_slice(&result0_buf1_off2.1[off..off+len]);
+                            result0_buf1_off2.0 = None;
+                            result0_buf1_off2.2 = 0usize;
+                            // ready for next reading
+                            self.read_in_bg();
+                        }
+                        #[cfg(debug_assertions)]
+                        debug!("AsyncBorrowedFdStream: fd={fd} poll_read => ready(ok({len}->{remain}))");
+                        Poll::Ready(Ok(()))
+                    },
+                    // Read done and dead
+                    Some(Err(ref e)) => {
+                        info!("AsyncBorrowedFdStream: fd={fd} poll_read => ready(err)");
+                        Poll::Ready(Err(std::io::Error::new(e.kind(), format!("{e}"))))
+                    },
+                    // Read not started yet
+                    None => {
+                        // Request wake
+                        wakers.push(cx.waker().clone());
+                        #[cfg(debug_assertions)]
+                        debug!("AsyncBorrowedFdStream: fd={fd} poll_read => pending(early)");
+                        Poll::Pending
+                    },
+                }
+            },
+            // Poisoned
+            Err(std::sync::TryLockError::Poisoned(e)) => {
+                // Just panic
+                panic!("Background reading panicked: {e}");
+            },
+            // Read not ready
+            Err(std::sync::TryLockError::WouldBlock) => {
+                // Request wake
+                wakers.push(cx.waker().clone());
+                #[cfg(debug_assertions)]
+                debug!("AsyncBorrowedFdStream: fd={fd} poll_read => pending(WouldBlock)");
+                Poll::Pending
+            },
         }
     }
 }
 
-impl<'a> AsyncWrite for AsyncBorrowedFdStream<'a> {
+impl AsyncWrite for AsyncBorrowedFdStream {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8]
     ) -> Poll<io::Result<usize>> {
-        loop {
-            let mut guard = ready!(self.fd.poll_write_ready(cx))?;
-            let mut shut_down = self.shut_down;
-
-            match guard.try_io(|inner| Self::raw_write(inner.as_raw_fd(), buf, &mut shut_down)) {
-                Ok(result) => {
-                    self.shut_down = shut_down;
-                    return Poll::Ready(result);
-                },
-                Err(_would_block) => {
-                    self.shut_down = shut_down;
-                    continue;
-                },
-            }
+        let fd = self.fd;
+        #[cfg(debug_assertions)]
+        debug!("AsyncBorrowedFdStream: fd={fd} poll_write");
+        // Lock wakers first. See comment in write_in_bg for rationale.
+        let mut wakers = self.write_wakers.lock().unwrap();
+        match self.write_lock.try_lock() {
+            Ok(ref mut result0_buf1_len2_sd3) => {
+                *self.shut_down.lock().unwrap() |= result0_buf1_len2_sd3.3; // if shut down, update
+                match result0_buf1_len2_sd3.0 {
+                    // Write done and ready for next
+                    Some(Ok(_)) => {
+                        if *self.shut_down.lock().unwrap() {
+                            return Poll::Ready(Ok(0usize)); // if shut down, then keep as is and do nothing further
+                        }
+                        // max write is buf.len()
+                        let input_len = result0_buf1_len2_sd3.1.len();
+                        let len = std::cmp::min(input_len, buf.len());
+                        result0_buf1_len2_sd3.0 = None;
+                        result0_buf1_len2_sd3.1[..len].copy_from_slice(&buf[..len]);
+                        result0_buf1_len2_sd3.2 = len;
+                        assert!(!result0_buf1_len2_sd3.3, "write already shut down on non-shut-down branch");
+                        self.write_in_bg();
+                        // behave like buffered writer; claims Ready
+                        #[cfg(debug_assertions)]
+                        debug!("AsyncBorrowedFdStream: fd={fd} poll_write => ready(ok({input_len}->{len}))");
+                        Poll::Ready(Ok(len))
+                    },
+                    // Write done and dead
+                    Some(Err(ref e)) => {
+                        info!("AsyncBorrowedFdStream: fd={fd} poll_write => ready(err)");
+                        Poll::Ready(Err(std::io::Error::new(e.kind(), format!("{e}"))))
+                    },
+                    // Write not started yet
+                    None => {
+                        // Request wake
+                        wakers.push(cx.waker().clone());
+                        #[cfg(debug_assertions)]
+                        debug!("AsyncBorrowedFdStream: fd={fd} poll_write => pending(early)");
+                        Poll::Pending
+                    },
+                }
+            },
+            // Poisoned
+            Err(std::sync::TryLockError::Poisoned(e)) => {
+                // Just panic
+                panic!("Background writing panicked: {e}");
+            },
+            // Write not ready
+            Err(std::sync::TryLockError::WouldBlock) => {
+                // Request wake
+                wakers.push(cx.waker().clone());
+                #[cfg(debug_assertions)]
+                debug!("AsyncBorrowedFdStream: fd={fd} poll_write => pending(WouldBlock)");
+                Poll::Pending
+            },
         }
     }
 
     fn poll_flush(
         self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        cx: &mut Context<'_>,
     ) -> Poll<io::Result<()>> {
-        // flush is a no-op
-        Poll::Ready(Ok(()))
+        let fd = self.fd;
+        #[cfg(debug_assertions)]
+        debug!("AsyncBorrowedFdStream: fd={fd} poll_flush");
+        // Lock wakers first. See comment in write_in_bg for rationale.
+        let mut wakers = self.write_wakers.lock().unwrap();
+        match self.write_lock.try_lock() {
+            Ok(ref mut result0_buf1_len2_sd3) => {
+                match result0_buf1_len2_sd3.0 {
+                    // Write done and ready for next
+                    Some(Ok(_)) => {
+                        #[cfg(debug_assertions)]
+                        debug!("AsyncBorrowedFdStream: fd={fd} poll_flush => ready(ok)");
+                        Poll::Ready(Ok(()))
+                    },
+                    // Write done and dead
+                    Some(Err(ref e)) => {
+                        info!("AsyncBorrowedFdStream: fd={fd} poll_flush => ready(err)");
+                        Poll::Ready(Err(std::io::Error::new(e.kind(), format!("{e}"))))
+                    },
+                    // Write not started yet
+                    None => {
+                        // Request wake
+                        wakers.push(cx.waker().clone());
+                        #[cfg(debug_assertions)]
+                        debug!("AsyncBorrowedFdStream: fd={fd} poll_flush => pending(early)");
+                        Poll::Pending
+                    },
+                }
+            },
+            // Poisoned
+            Err(std::sync::TryLockError::Poisoned(e)) => {
+                // Just panic
+                panic!("Background flushing panicked: {e}");
+            },
+            // Write not ready
+            Err(std::sync::TryLockError::WouldBlock) => {
+                // Request wake
+                wakers.push(cx.waker().clone());
+                #[cfg(debug_assertions)]
+                debug!("AsyncBorrowedFdStream: fd={fd} poll_flush => pending(WouldBlock)");
+                Poll::Pending
+            },
+        }
     }
 
     fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
     ) -> Poll<io::Result<()>> {
-        Poll::Ready(Self::raw_shutdown(self.fd.as_raw_fd(), &mut self.shut_down))
+        if self.skips_shut_down { // if you know it's gonna be denied, don't even try.
+            #[cfg(debug_assertions)]
+            debug!("AsyncBorrowedFdStream: fd={fd} poll_shutdown => ready(skipped, fake err)");
+            return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Mock error: Permission denied (os error 13)")));
+        }
+        let fd = self.fd;
+        #[cfg(debug_assertions)]
+        debug!("AsyncBorrowedFdStream: fd={fd} poll_shutdown");
+        if *self.shut_down.lock().unwrap() {
+            #[cfg(debug_assertions)]
+            debug!("AsyncBorrowedFdStream: fd={fd} poll_shutdown => ready(skipped)");
+            Poll::Ready(Ok(()))
+        } else {
+            let mut wakers = self.shutdown_wakers.lock().unwrap();
+            match self.shutdown_lock.try_lock() {
+                Ok(result) => {
+                    match *result {
+                        // Shutdown done and successful
+                        Some(Ok(_)) => {
+                            *self.shut_down.lock().unwrap() = true;
+                            #[cfg(debug_assertions)]
+                            debug!("AsyncBorrowedFdStream: fd={fd} poll_shutdown => ready(ok)");
+                            Poll::Ready(Ok(()))
+                        },
+                        // Shutdown done and dead
+                        Some(Err(ref e)) => {
+                            info!("AsyncBorrowedFdStream: fd={fd} poll_shutdown => ready(err)");
+                            Poll::Ready(Err(std::io::Error::new(e.kind(), format!("{e}"))))
+                        },
+                        // Shutdown not scheduled or started yet
+                        None => {
+                            if wakers.is_empty() {
+                                self.shutdown_in_bg();
+                            }
+                            // Request wake
+                            wakers.push(cx.waker().clone());
+                            #[cfg(debug_assertions)]
+                            debug!("AsyncBorrowedFdStream: fd={fd} poll_shutdown => pending(start)");
+                            Poll::Pending
+                        },
+                    }
+                },
+                // Poisoned
+                Err(std::sync::TryLockError::Poisoned(e)) => {
+                    // Just panic
+                    panic!("Background shutting down panicked: {e}");
+                },
+                // Write not ready
+                Err(std::sync::TryLockError::WouldBlock) => {
+                    // Request wake
+                    wakers.push(cx.waker().clone());
+                    #[cfg(debug_assertions)]
+                    debug!("AsyncBorrowedFdStream: fd={fd} poll_shutdown => pending(WouldBlock)");
+                    Poll::Pending
+                },
+            }
+        }
     }
 }
 
-impl<'a> AsRawFd for AsyncBorrowedFdStream<'a> {
+impl AsRawFd for AsyncBorrowedFdStream {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
     }
@@ -396,7 +684,7 @@ pub enum FwdDirection {
 /// After failed attempts to implement these as AsyncWrite and AsyncRead, 
 /// which cannot be done due to lack of support of setting non-block to file descriptors and ioctl check buffer sbytes,
 /// now these are implemented as blocking and uses tokio::task::spawn_blocking which are glorified threads. Two of these per connection.
-/// Note: due to how AsyncFd works, this class requires that any tokio::net::TcpStream be converted to std::net::TcpStream,
+/// Note: due to how blocking IO works, this class requires that any tokio::net::TcpStream be converted to std::net::TcpStream,
 /// and set everything to blocking before passing its RawFd.
 /// It also does not use the async implementations in AsyncBorrowedFdStream (only the raw_* ones).
 pub struct AsyncForwarderSession {
@@ -418,23 +706,24 @@ impl AsyncForwarderSession {
         AsyncForwarderSession { local, remote, _drop_closer_v, _drop_closer_t, port }
     }
 
-    fn forward_once(src: RawFd, tgt: RawFd, _dir: FwdDirection, shut_down: &mut bool) -> io::Result<bool> {
+    fn forward_once(src: RawFd, tgt: RawFd, _dir: FwdDirection) -> io::Result<bool> {
         let mut buf = [0u8; MAX_FRAME_SIZE];
         let size = AsyncBorrowedFdStream::raw_read(src, &mut buf)?;
         if size == 0 {
             return Ok(true);
         }
-        AsyncBorrowedFdStream::raw_write_all(tgt, &buf[..size], shut_down)?;
-        Ok(false)
+        let (result, shut_down) = AsyncBorrowedFdStream::raw_write_all(tgt, &buf[..size]);
+        result?;
+        Ok(shut_down)
     }
 
     fn run_oneway_try(
-        port: u16, src: RawFd, tgt: RawFd, dir: FwdDirection, shut_down: &mut bool
+        port: u16, src: RawFd, tgt: RawFd, dir: FwdDirection
     ) -> io::Result<()> {
         loop {
-            match Self::forward_once(src, tgt, dir, shut_down) {
+            match Self::forward_once(src, tgt, dir) {
                 Ok(shutdown) => if shutdown { return Ok(()); },
-                Err(e) => { error!("Failed in {dir:?} run_oneway_try for port {}: {e}", port); return Err(e); }
+                Err(e) => { error!("Failed in {dir:?} run_oneway_try for port {} fd {src}->{tgt}: {e}", port); return Err(e); }
             }
         }
     }
@@ -442,28 +731,27 @@ impl AsyncForwarderSession {
     fn run_oneway(
         port: u16, src: RawFd, tgt: RawFd, dir: FwdDirection
     ) -> io::Result<()> {
-        let mut shut_down = false;
-        let result = Self::run_oneway_try(port, src, tgt, dir, &mut shut_down);
-        AsyncBorrowedFdStream::raw_shutdown(tgt, &mut shut_down)
-            .inspect_err(|e| error!("Forwarding port {} {dir:?} teardown: {e}", port)).ok();
+        let result = Self::run_oneway_try(port, src, tgt, dir);
+        AsyncBorrowedFdStream::raw_shutdown(tgt)
+            .inspect_err(|e| error!("Forwarding port {} fd {src}->{tgt} {dir:?} teardown: {e}", port)).ok();
         result
     }
 
     /// Run forwarding with tokio::task::spawn_blocking
     pub async fn run(me: Self) -> io::Result<()> {
         let (local, remote, port) = (me.local, me.remote, me.port);
-        info!("Forwarding session on port {port} started");
+        info!("Forwarding session on port {port} fd {local}->{remote} started");
         let fw = task::spawn_blocking(move || AsyncForwarderSession::run_oneway(port, local, remote, FwdDirection::Fwd));
         let bw = task::spawn_blocking(move || AsyncForwarderSession::run_oneway(port, remote, local, FwdDirection::Bwd));
         let (fw, bw) = (fw.await, bw.await);
         match fw {
-            Err(ref e) => { error!("Forwarding session (fwd) on port {} aborted: {e}", port); },
-            Ok(Err(ref e)) => { error!("Forwarding session (fwd) on port {} failed: {e}", port); },
+            Err(ref e) => { error!("Forwarding session (fwd) on port {} fd {local}->{remote} aborted: {e}", port); },
+            Ok(Err(ref e)) => { error!("Forwarding session (fwd) on port {} fd {local}->{remote} failed: {e}", port); },
             _ => {},
         }
         match bw {
-            Err(ref e) => { error!("Forwarding session (bwd) on port {} aborted: {e}", port); },
-            Ok(Err(ref e)) => { error!("Forwarding session (bwd) on port {} failed: {e}", port); },
+            Err(ref e) => { error!("Forwarding session (bwd) on port {} fd {local}->{remote} aborted: {e}", port); },
+            Ok(Err(ref e)) => { error!("Forwarding session (bwd) on port {} fd {local}->{remote} failed: {e}", port); },
             _ => {},
         }
         fw??;
