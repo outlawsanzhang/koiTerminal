@@ -355,9 +355,11 @@ impl KoiService {
     async fn run_reverse_connection_listener_blocking(
         port: u16, callback: SharedIkoiHostCallback,
     ) -> Result<()> {
+        let vsock_cid = vsock::get_local_cid()
+            .inspect_err(|e| error!("Could not determine local CID"))?;
         let mut listeners = TcpListeners::bind(port).await?;
-        let vlistener = VsockListener::bind_with_cid_port(vsock::VMADDR_CID_ANY, port.into())
-            .inspect_err(|e| error!("Cannot listen to vsock port {port}: {e}"))?;
+        let vlistener = VsockListener::bind_with_cid_port(vsock_cid, port.into())
+            .inspect_err(|e| error!("Cannot listen to vsock port {vsock_cid}:{port}: {e}"))?;
         loop {
             if let Ok(session) = Self::reverse_connect_once_blocking(
                 &mut listeners, &vlistener, port, callback.clone()
