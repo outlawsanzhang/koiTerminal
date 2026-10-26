@@ -22,19 +22,19 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::error::Error as stdError;
 use std::fmt;
 use std::io;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, ToSocketAddrs};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::result;
 use std::sync::{Arc, LazyLock, Mutex};
 
-use android_logger::Config;
+use android_logger::{Config, FilterBuilder};
 use fast_socks5::{
     server::{DnsResolveHelper as _, ErrorContext, Socks5ServerProtocol, SocksServerError, states}, // , run_udp_proxy
     util::{stream::{ConnectError, tcp_connect_with_timeout}, target_addr::TargetAddr},
     ReplyError, Result as SocksResult, Socks5Command, // , SocksError
 };
 use forwarder::forwarder::ForwarderSession;
-use forwarder::stream::{AsyncBorrowedFdStream, AsyncForwarderSession, StreamSocket};
+use forwarder::stream::{AsyncBorrowedFdStream};
 use jni::objects::{GlobalRef, JClass, JIntArray, JObject, JValue, JValueOwned};
 use jni::sys::jint;
 use jni::{JNIEnv, JavaVM};
@@ -244,7 +244,7 @@ impl RcSocks5Proxy {
     }
 
     /// Handle the connect command by running a TCP proxy until the connection is done.
-    async fn run_tcp_proxy_blocking(
+    async fn run_tcp_proxy(
         proto: Socks5ServerProtocol<AsyncBorrowedFdStream, states::CommandRead>,
         addr: &TargetAddr,
         setup: Arc<Socks5Setup>,
@@ -263,7 +263,7 @@ impl RcSocks5Proxy {
         );
 
         // TCP connect with timeout, to avoid memory leak for connection that takes forever
-        let outbound = match tcp_connect_with_timeout(addr, setup.timeout).await {
+        let mut outbound = match tcp_connect_with_timeout(addr, setup.timeout).await {
             Ok(stream) => stream,
             Err(err) => {
                 proto.reply_error(&err.to_reply_error()).await?;
@@ -279,27 +279,14 @@ impl RcSocks5Proxy {
 
         debug!("Socks5 connected to remote destination");
 
-        let inner = proto
+        let mut inner = proto
             .reply_success(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0))
             .await?;
-        let outbound = outbound.into_std().map_err(|e| {
-            error!("Cannot convert tokio::net::TcpStream to std::net::TcpStream: {e}");
-            SocksServerError::Bug("Cannot convert tokio::net::TcpStream to std::net::TcpStream")
-        })?;
-        outbound.set_nonblocking(false)
-            .inspect_err(|e| error!("Cannot set tcp connection to blocking: {e}")).ok();
 
-        let session = AsyncForwarderSession::new(
-            inner.as_raw_fd(),
-            outbound.as_raw_fd(),
-            None,
-            Some(outbound),
-            0
-        );
-        std::mem::drop(inner);
-        AsyncForwarderSession::run(session).await
-            .inspect_err(|e| error!("fast-socks5 running forwarder session error: {e}"))
-            .map_err(|_| SocksServerError::Bug("fast-socks5 running forwarder session error"))?;
+        match tokio::io::copy_bidirectional(&mut inner, &mut outbound).await {
+            Ok(res) => debug!("transfer closed ({}, {})", res.0, res.1),
+            Err(err) => error!("transfer error: {:?}", err),
+        };
         Ok(())
     }
 
@@ -311,7 +298,7 @@ impl RcSocks5Proxy {
             .resolve_dns().await.inspect_err(|e| error!("fast-socks5 new connection dns error: {e}"))?;
         match cmd {
             Socks5Command::TCPConnect => {
-                Self::run_tcp_proxy_blocking(proto, &target_addr, setup, true).await.inspect_err(|e| error!("fast-socks5 connection running error: {e}"))?;
+                Self::run_tcp_proxy(proto, &target_addr, setup, true).await.inspect_err(|e| error!("fast-socks5 connection running error: {e}"))?;
             }
             Socks5Command::UDPAssociate => {
                 // // TODO: UDP requires a jni_cb member function like
@@ -345,24 +332,34 @@ impl ReverseConnectedService for RcSocks5Proxy {
     fn on_new_connection(&mut self, fd: RawFd) -> Result<Option<ForwarderSession>> {
         let rt = self.rt.clone();
         let setup = self.setup.clone();
-        // Delegated proxy:
-        if setup.delegated != 0 {
-            let tcp_stream = TcpStream::connect((Ipv4Addr::LOCALHOST, setup.delegated)).map_err(Error::TcpAccept)?;
-            // Safety: fd only used in rust, and closing in jni is called when done, and specified not handling closing
-            let mut vsock_stream = unsafe { StreamSocket::from_raw_fd(fd) };
-            vsock_stream.handles_closing = false;
-            return Ok(Some(ForwarderSession::new(tcp_stream.into(), vsock_stream)));
-        }
-        // Managed proxy:
-        // AsyncBorrowedFdStream pretends to be an async task but is actually blocking,
-        // and cannot be implemented as non-blocking due to Android restrictions on
-        // file descriptor set non-blocking and query buffer emptiness
-        // FIXME: Not blocking if AsyncBorrowedFdStream becomes actually non-blocking
-        self.rt.spawn_blocking(move || {
+
+        // Use tokio for everything instead due to stability issues with how vmm_sys_util::poll is used in this crate.
+        // AsyncBorrowedFdStream is technically an async task but uses spawn_blocking a lot,
+        // and cannot be implemented as non-blocking polling-based due to Android restrictions on
+        // file descriptor set non-blocking and query buffer emptiness.
+        self.rt.spawn(async move {
+            // Safety: only other operation is closing the vsock, which happens outside the scope of `vsock_stream`
             let mut vsock_stream = unsafe { AsyncBorrowedFdStream::new(&fd, rt, true) };
-            let result = tokio::runtime::Handle::current().block_on(
-                Self::run_new_connection_blocking(vsock_stream, setup)
-            );
+            let result = if setup.delegated == 0 {
+                // Managed proxy:
+                Self::run_new_connection(vsock_stream, setup).await
+            } else {
+                // Delegated proxy:
+                let addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), setup.delegated);
+                match tcp_connect_with_timeout(addr, setup.timeout).await {
+                    Ok(mut tcp_stream) => {
+                        match tokio::io::copy_bidirectional(&mut vsock_stream, &mut tcp_stream).await {
+                            Ok(res) => debug!("transfer closed ({}, {})", res.0, res.1),
+                            Err(err) => error!("transfer error: {:?}", err),
+                        }
+                        Ok(())
+                    },
+                    Err(e) => {
+                        error!("Reverse-connected service error on delegating new connection: {e}");
+                        Err(e.into())
+                    },
+                }
+            };
             let mut revdisc_queue = REVDISC_QUEUE.lock().unwrap();
             revdisc_queue.push_back(fd);
             REVDISC_EVT.write(1).expect("failed to write reverse-disconnect eventfd");
@@ -593,7 +590,7 @@ impl ForwarderSessions {
 
     fn accept_connection(
         &mut self,
-        poll_ctx: &PollContext<Token>,
+        _poll_ctx: &PollContext<Token>,
         port: u16,
         sock_family: SocketFamily,
     ) -> Result<()> {
@@ -606,13 +603,9 @@ impl ForwarderSessions {
             SocketFamily::Ipv6 => &port_listeners.tcp6_listener,
         };
 
-        // This session should be dropped if any of the PollContext setup fails. Since the only
-        // extant fds for the underlying sockets will be closed, they will be unregistered from
-        // epoll set automatically.
+        // Switching to tokio session due to stability issues.
         let jni_h = self.jni_h.clone();
-        let session =
-            create_forwarder_session(listener, self.cid, jni_h)?;
-        self.include_session(poll_ctx, session, port.into())?;
+        spawn_forwarder_session(listener, self.cid, jni_h, self.rt.clone())?;
         Ok(())
     }
 
@@ -760,14 +753,14 @@ impl ForwarderSessions {
 }
 
 /// Creates a forwarder session from a `listener` that has a pending connection to accept.
-/// FIXME: this is blocking. But the upstream version literally blocks with a timeout of 10 seconds 
-///     so it's ok ig idk who cares about DoS amirite
-fn create_forwarder_session(
+fn spawn_forwarder_session(
     listener: &TcpListener,
     _cid: u32,
     jni_h: Arc<Mutex<JNIHandler>>,
-) -> Result<ForwarderSession> {
+    rt: Arc<Runtime>,
+) -> Result<()> {
     let (tcp_stream, _) = listener.accept().map_err(Error::TcpAccept)?;
+    tcp_stream.set_nonblocking(true).map_err(Error::TcpAccept)?;
     // Cannot bind vsock ports due to permission issues. Use callback to obtain connection instead.
     // Note that the original implementation is host=initiate + guest=connect,
     // while using connectVsock() can only give you host=connect + guest=initiate.
@@ -781,20 +774,32 @@ fn create_forwarder_session(
 
     // Ask guest to connect.
     info!("forwarder_host setting up guest connection: VSOCK-LISTEN ({vsock_port}) > TCP-CONNECT ({tcp4_port})");
-    jni_h.lock().unwrap().onForwardingRequestReceived(tcp4_port as i32, vsock_port as i32)?;
-    // brief wait for socat to come online
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    let jni_h = jni_h.clone();
+    jni_h.clone().lock().unwrap().onForwardingRequestReceived(tcp4_port as i32, vsock_port as i32)?;
 
-    // Connect from host and assume that the guest is listening on the vsock.
-    info!("forwarder_host setting up connection: TCP-LISTEN ({tcp4_port}) > VSOCK-CONNECT ({vsock_port})");
-    let vsock_rawfd = jni_h.lock().unwrap().hostConnectVsock(vsock_port.into())?;
+    rt.clone().spawn(async move {
+        // brief wait for socat to come online
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    // The original workflow of listening for vsock connection does not apply.
-    // Simply try connecting the vsock.
-    // Safety: fd only used in rust, and closing in jni is called when done, and specified not handling closing
-    let mut vsock_stream = unsafe { StreamSocket::from_raw_fd(vsock_rawfd) };
-    vsock_stream.handles_closing = false;
-    Ok(ForwarderSession::new(tcp_stream.into(), vsock_stream))
+        // Connect from host and assume that the guest is listening on the vsock.
+        info!("forwarder_host setting up connection: TCP-LISTEN ({tcp4_port}) > VSOCK-CONNECT ({vsock_port})");
+        let vsock_rawfd = jni_h.lock().unwrap().hostConnectVsock(vsock_port.into())?;
+
+        // The original workflow of listening for vsock connection does not apply.
+        // Simply try connecting the vsock.
+        // Safety: fd only used in rust, and closing in jni is called when done, and specified not handling closing
+        let mut vsock_stream = unsafe { AsyncBorrowedFdStream::new(&vsock_rawfd, rt, true) };
+        let mut tcp_stream = tokio::net::TcpStream::from_std(tcp_stream).map_err(Error::TcpAccept)?;
+        match tokio::io::copy_bidirectional(&mut vsock_stream, &mut tcp_stream).await {
+            Ok(res) => debug!("transfer closed ({}, {})", res.0, res.1),
+            Err(err) => error!("transfer error: {:?}", err),
+        }
+        let mut revdisc_queue = REVDISC_QUEUE.lock().unwrap();
+        revdisc_queue.push_back(vsock_rawfd);
+        REVDISC_EVT.write(1).expect("failed to write reverse-disconnect eventfd");
+        Ok::<(), Error>(())
+    });
+    Ok(())
 }
 
 #[allow(non_snake_case)]
@@ -897,7 +902,8 @@ pub extern "C" fn Java_com_android_virtualization_terminal_ForwarderHost_run(
     callback: JObject,
 ) {
     android_logger::init_once(
-        Config::default().with_max_level(LevelFilter::Debug).with_tag("ForwarderHost"),
+        Config::default().with_max_level(LevelFilter::Debug).with_tag("ForwarderHost")
+            .with_filter(FilterBuilder::new().parse("debug,tokio=info,fast_socks5=info").build()),
     );
 
     // Clear shutdown event FD before running forwarder host.

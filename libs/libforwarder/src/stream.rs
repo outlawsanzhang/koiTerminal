@@ -756,7 +756,7 @@ impl AsyncForwarderSession {
         }
         fw??;
         bw??;
-        info!("Forwarding session on port {port} ended successfully");
+        info!("Forwarding session on port {port} fd {local}->{remote} ended successfully");
         Ok(())
     }
 }
