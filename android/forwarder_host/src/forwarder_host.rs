@@ -35,9 +35,9 @@ use fast_socks5::{
 };
 use forwarder::forwarder::ForwarderSession;
 use forwarder::stream::{AsyncBorrowedFdStream, AsyncForwarderSession, StreamSocket};
-use jni::objects::{JClass, JIntArray, JObject, JValue, JValueOwned};
+use jni::objects::{GlobalRef, JClass, JIntArray, JObject, JValue, JValueOwned};
 use jni::sys::jint;
-use jni::JNIEnv;
+use jni::{JNIEnv, JavaVM};
 use log::{debug, error, info, warn, LevelFilter};
 use nix::sys::eventfd::{EfdFlags, EventFd};
 use poll_token_derive::PollToken;
@@ -243,9 +243,9 @@ impl RcSocks5Proxy {
         }
     }
 
-    // FIXME: Not blocking if AsyncBorrowedFdStream becomes actually non-blocking
-    async fn run_tcp_proxy_blocking<'a>(
-        proto: Socks5ServerProtocol<AsyncBorrowedFdStream<'a>, states::CommandRead>,
+    /// Handle the connect command by running a TCP proxy until the connection is done.
+    async fn run_tcp_proxy_blocking(
+        proto: Socks5ServerProtocol<AsyncBorrowedFdStream, states::CommandRead>,
         addr: &TargetAddr,
         setup: Arc<Socks5Setup>,
         nodelay: bool,
@@ -372,27 +372,96 @@ impl ReverseConnectedService for RcSocks5Proxy {
     }
 }
 
+struct JNIHandler {
+    vm: JavaVM,
+    cb: GlobalRef,
+}
+
+impl JNIHandler {
+    fn env<T: FnOnce(jni::errors::Error) -> Error>(&self, err: T) -> Result<JNIEnv<'_>> {
+        self.vm.attach_current_thread_as_daemon().map_err(err)
+    }
+
+    /// Call hostConnectVsock(Int) through JNI
+    #[allow(non_snake_case)]
+    fn hostConnectVsock(
+        &mut self,
+        vsock_port: i32,
+    ) -> Result<RawFd> {
+        Ok(
+            self.env(Error::VsockConnect)?.call_method(
+                self.cb.as_obj(),
+                "hostConnectVsock",
+                "(I)I",
+                &[JValue::Int(vsock_port)],
+            )
+            .map_err(Error::VsockConnect)?
+            .i().map_err(Error::VsockConnect)?
+            as RawFd
+        )
+    }
+
+    /// Call hostDisconnectVsock(Int) through JNI
+    #[allow(non_snake_case)]
+    fn hostDisconnectVsock(
+        &mut self,
+        fd: RawFd,
+    ) -> Result<()> {
+        self.env(Error::VsockConnect)?
+            .call_method(
+                self.cb.as_obj(),
+                "hostDisconnectVsock",
+                "(I)V",
+                #[allow(clippy::unnecessary_cast)]
+                &[JValue::Int(fd as i32)],
+            )
+            .map_err(Error::VsockDisconnect)?;
+        Ok(())
+    }
+
+    /// Call onForwardingRequestReceived(Int, Int) through JNI
+    #[allow(non_snake_case)]
+    fn onForwardingRequestReceived(
+        &mut self,
+        tcp4_port: i32,
+        vsock_port: i32,
+    ) -> Result<()> {
+        self.env(Error::VsockConnect)?
+            .call_method(
+                self.cb.as_obj(),
+                "onForwardingRequestReceived",
+                "(II)V",
+                &[JValue::Int(tcp4_port), JValue::Int(vsock_port)],
+            )
+            .map_err(Error::VsockConnect)?;
+        Ok(())
+    }
+}
+
 /// ForwarderSessions encapsulates all forwarding state for chunneld.
-struct ForwarderSessions<'a> {
+struct ForwarderSessions {
     listening_ports: BTreeMap<u16, PortListeners>,
     tcp4_forwarders: HashMap<SessionTag, ForwarderSession>,
     reverse_connected_services: BTreeMap<i32, Mutex<Box<dyn ReverseConnectedService + 'static>>>,
     cid: u32,
-    jni_env: JNIEnv<'a>,
-    jni_cb: JObject<'a>,
+    jni_h: Arc<Mutex<JNIHandler>>,
     rt: Arc<Runtime>,
 }
 
-impl<'a> ForwarderSessions<'a> {
+impl ForwarderSessions {
     /// Creates a new instance of ForwarderSessions.
-    fn new(cid: i32, jni_env: JNIEnv<'a>, setup: JObject, jni_cb: JObject<'a>) -> Result<Self> {
+    fn new<'a>(cid: i32, mut jni_env: JNIEnv<'a>, setup: JObject, jni_cb: JObject<'a>) -> Result<Self> {
+        let setup = ForwarderHostSetup::from_java(&mut jni_env, setup)
+            .map_err(|e| { error!("Cannot parse ForwarderHostSetup: {e}"); Error::JNI(e) })?;
         let mut session = ForwarderSessions {
             listening_ports: BTreeMap::new(),
             tcp4_forwarders: HashMap::new(),
             reverse_connected_services: BTreeMap::new(),
             cid: cid as u32,
-            jni_env,
-            jni_cb,
+            jni_h: Arc::new(Mutex::new(JNIHandler {
+                vm: jni_env.get_java_vm().map_err(Error::JNI)?,
+                cb: jni_env.new_global_ref(jni_cb).map_err(Error::JNI)?,
+            })),
             rt: Arc::new(
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -400,8 +469,6 @@ impl<'a> ForwarderSessions<'a> {
                     .expect("Failed to create tokio runtime")
             ),
         };
-        let setup = ForwarderHostSetup::from_java(&mut session.jni_env, setup)
-            .map_err(|e| { error!("Cannot parse ForwarderHostSetup: {e}"); Error::JNI(e) })?;
         debug!("ForwarderSessions: received ForwarderHostSetup from Kotlin = {setup:?}");
         if setup.rcServices.contains(&setup.REVCONN_SOCKS5_PROXY) {
             info!("ForwarderSessions: setting up reverse-connected socks5 proxy at vsock port {}", setup.SOCKS5_PORT);
@@ -483,15 +550,18 @@ impl<'a> ForwarderSessions<'a> {
 
         // Forward connections one by one
         while let Some(port) = reverse_connect_queue.pop_front() {
+            let fd: RawFd;
             let connection = {
+                let jni_h = self.jni_h.clone();
                 let service = self.reverse_connected_services.get_mut(&port).ok_or(Error::NoRcServiceForPort(port))?
                     .get_mut().map_err(|_| Error::NoRcServiceForPort(port))?;
-                let fd = hostConnectVsock(&mut self.jni_env, &self.jni_cb, port)?;
+                fd = jni_h.lock().unwrap().hostConnectVsock(port)?;
                 service.on_new_connection(fd)
             };
             match connection {
                 Err(e) => {
                     error!("Reverse-connected service error on accepting new connection: {e}");
+                    self.jni_h.lock().unwrap().hostDisconnectVsock(fd).ok();
                     return Err(e);
                 },
                 Ok(None) => {},
@@ -512,7 +582,7 @@ impl<'a> ForwarderSessions<'a> {
 
         // Disconnect connections one by one
         while let Some(fd) = reverse_disconnect_queue.pop_front() {
-            self.close_vsock_connection(fd)?;
+            self.jni_h.lock().unwrap().hostDisconnectVsock(fd)?;
         }
 
         // Consume the eventfd.
@@ -539,8 +609,9 @@ impl<'a> ForwarderSessions<'a> {
         // This session should be dropped if any of the PollContext setup fails. Since the only
         // extant fds for the underlying sockets will be closed, they will be unregistered from
         // epoll set automatically.
+        let jni_h = self.jni_h.clone();
         let session =
-            create_forwarder_session(listener, self.cid, &mut self.jni_env, &self.jni_cb)?;
+            create_forwarder_session(listener, self.cid, jni_h)?;
         self.include_session(poll_ctx, session, port.into())?;
         Ok(())
     }
@@ -571,7 +642,7 @@ impl<'a> ForwarderSessions<'a> {
             poll_ctx.delete(session.local_stream()).map_err(Error::PollContextDelete)?;
             if session.is_shut_down() {
                 let vsock_rawfd = session.remote_stream().as_raw_fd();
-                self.close_vsock_connection(vsock_rawfd).ok();
+                self.jni_h.lock().unwrap().hostDisconnectVsock(vsock_rawfd).ok();
                 self.tcp4_forwarders.remove(&tag);
             }
         }
@@ -593,16 +664,12 @@ impl<'a> ForwarderSessions<'a> {
             poll_ctx.delete(session.remote_stream()).map_err(Error::PollContextDelete)?;
             if session.is_shut_down() {
                 let vsock_rawfd = session.remote_stream().as_raw_fd();
-                self.close_vsock_connection(vsock_rawfd).ok();
+                self.jni_h.lock().unwrap().hostDisconnectVsock(vsock_rawfd).ok();
                 self.tcp4_forwarders.remove(&tag);
             }
         }
 
         Ok(())
-    }
-
-    fn close_vsock_connection(&mut self, fd: RawFd) -> Result<()> {
-        hostDisconnectVsock(&mut self.jni_env, &self.jni_cb, fd)
     }
 
     // FIXME: as of Android 17 (no QPR), upstream implemented this in a way that, if the VM is very slow in either
@@ -644,7 +711,8 @@ impl<'a> ForwarderSessions<'a> {
                             Some(rt) => { rt.shutdown_timeout(std::time::Duration::from_millis(500)); },
                             None => { error!("ForwarderSession shutdown dirty: tokio runtime still possessed elsewhere"); },
                         }
-                        hostDisconnectVsock(&mut self.jni_env, &self.jni_cb, -1) // disconnect all
+                        let mut jni_h = self.jni_h.lock().unwrap();
+                        jni_h.hostDisconnectVsock(-1) // disconnect all
                             .inspect_err(|e| error!("ForwarderSession shutdown dirty, closing vsock error: {e}")).ok();
                         return Ok(());
                     }
@@ -691,53 +759,13 @@ impl<'a> ForwarderSessions<'a> {
     }
 }
 
-/// Call hostConnectVsock(Int) through JNI
-#[allow(non_snake_case)]
-fn hostConnectVsock(
-    jni_env: &mut JNIEnv,
-    jni_cb: &JObject,
-    vsock_port: i32,
-) -> Result<RawFd> {
-    Ok(
-        jni_env.call_method(
-            jni_cb,
-            "hostConnectVsock",
-            "(I)I",
-            &[JValue::Int(vsock_port)],
-        )
-        .map_err(Error::VsockConnect)?
-        .i().map_err(Error::VsockConnect)?
-        as RawFd
-    )
-}
-
-/// Call hostDisconnectVsock(Int) through JNI
-#[allow(non_snake_case)]
-fn hostDisconnectVsock(
-    jni_env: &mut JNIEnv,
-    jni_cb: &JObject,
-    fd: RawFd,
-) -> Result<()> {
-    jni_env
-        .call_method(
-            jni_cb,
-            "hostDisconnectVsock",
-            "(I)V",
-            #[allow(clippy::unnecessary_cast)]
-            &[JValue::Int(fd as i32)],
-        )
-        .map_err(Error::VsockDisconnect)?;
-    Ok(())
-}
-
 /// Creates a forwarder session from a `listener` that has a pending connection to accept.
 /// FIXME: this is blocking. But the upstream version literally blocks with a timeout of 10 seconds 
 ///     so it's ok ig idk who cares about DoS amirite
 fn create_forwarder_session(
     listener: &TcpListener,
     _cid: u32,
-    jni_env: &mut JNIEnv,
-    jni_cb: &JObject,
+    jni_h: Arc<Mutex<JNIHandler>>,
 ) -> Result<ForwarderSession> {
     let (tcp_stream, _) = listener.accept().map_err(Error::TcpAccept)?;
     // Cannot bind vsock ports due to permission issues. Use callback to obtain connection instead.
@@ -753,20 +781,13 @@ fn create_forwarder_session(
 
     // Ask guest to connect.
     info!("forwarder_host setting up guest connection: VSOCK-LISTEN ({vsock_port}) > TCP-CONNECT ({tcp4_port})");
-    jni_env
-        .call_method(
-            jni_cb,
-            "onForwardingRequestReceived",
-            "(II)V",
-            &[JValue::Int(tcp4_port as i32), JValue::Int(vsock_port as i32)],
-        )
-        .map_err(Error::VsockConnect)?;
+    jni_h.lock().unwrap().onForwardingRequestReceived(tcp4_port as i32, vsock_port as i32)?;
     // brief wait for socat to come online
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Connect from host and assume that the guest is listening on the vsock.
     info!("forwarder_host setting up connection: TCP-LISTEN ({tcp4_port}) > VSOCK-CONNECT ({vsock_port})");
-    let vsock_rawfd = hostConnectVsock(jni_env, jni_cb, vsock_port.into())?;
+    let vsock_rawfd = jni_h.lock().unwrap().hostConnectVsock(vsock_port.into())?;
 
     // The original workflow of listening for vsock connection does not apply.
     // Simply try connecting the vsock.
