@@ -24,7 +24,7 @@ use {
         IVmActivePortListener::IVmActivePortListener,
     },
 };
-use forwarder::stream::{AsyncForwarderSession};
+use forwarder::stream::AsyncForwarderSession;
 use log::{debug, error, info, warn};
 use rsbinder::rpc::{RpcServer, wire_android13::PROTOCOL_V2};
 use std::collections::{BTreeMap, HashSet};
@@ -364,7 +364,7 @@ impl KoiService {
             if let Ok(session) = Self::reverse_connect_once_blocking(
                 &mut listeners, &vlistener, port, callback.clone()
             ).await {
-                task::spawn(AsyncForwarderSession::run(session));
+                task::spawn(session.run());
             }
         }
     }

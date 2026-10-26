@@ -738,8 +738,8 @@ impl AsyncForwarderSession {
     }
 
     /// Run forwarding with tokio::task::spawn_blocking
-    pub async fn run(me: Self) -> io::Result<()> {
-        let (local, remote, port) = (me.local, me.remote, me.port);
+    pub async fn run(self) -> io::Result<()> {
+        let (local, remote, port) = (self.local, self.remote, self.port);
         info!("Forwarding session on port {port} fd {local}->{remote} started");
         let fw = task::spawn_blocking(move || AsyncForwarderSession::run_oneway(port, local, remote, FwdDirection::Fwd));
         let bw = task::spawn_blocking(move || AsyncForwarderSession::run_oneway(port, remote, local, FwdDirection::Bwd));
