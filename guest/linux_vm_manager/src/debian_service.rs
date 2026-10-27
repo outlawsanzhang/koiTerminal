@@ -128,36 +128,40 @@ impl IDebianService for DebianService {
     ) -> BinderResult<()> {
         let listener = listener.clone();
         self.rt.spawn(async move {
-            let managed_ports = match MANAGED_PORTS.lock() {
-                Ok(managed_ports) => managed_ports.clone(),
-                Err(_) => HashSet::new(),
-            };
-            let ret =
-                force_send(forwarder_guest_launcher::monitor_active_ports(async move |ports| {
-                    let ports_filtered: Vec<ActivePort> = ports
-                        .iter()
-                        .filter(|(port, comm)|
-                            !managed_ports.contains(*port) && *comm != "linux_vm_manage" // is truncated to 16-1=15
-                        )
-                        .map(|(port, comm)| ActivePort {
-                            port: *port as i32,
-                            comm: comm.to_string(),
-                        })
-                        .collect();
+            loop { // on error, resume
+                let managed_ports = match MANAGED_PORTS.lock() {
+                    Ok(managed_ports) => managed_ports.clone(),
+                    Err(_) => HashSet::new(),
+                };
+                let listener = listener.clone();
+                let ret =
+                    force_send(forwarder_guest_launcher::monitor_active_ports(async move |ports| {
+                        let ports_filtered: Vec<ActivePort> = ports
+                            .iter()
+                            .filter(|(port, comm)|
+                                !managed_ports.contains(*port) && *comm != "linux_vm_manage" // is truncated to 16-1=15
+                            )
+                            .map(|(port, comm)| ActivePort {
+                                port: *port as i32,
+                                comm: comm.to_string(),
+                            })
+                            .collect();
 
-                    info!("Updated active ports: {ports:?} -> {ports_filtered:?}");
-                    listener
-                        .reportActivePorts(&ports_filtered)
-                        .map_err(|e| anyhow!("Error in reportActivePorts(), {e:?}"))
-                }))
-                .await;
+                        info!("Updated active ports: {ports:?} -> {ports_filtered:?}");
+                        listener
+                            .reportActivePorts(&ports_filtered)
+                            .map_err(|e| anyhow!("Error in reportActivePorts(), {e:?}"))
+                    }))
+                    .await;
 
-            match ret {
-                Ok(()) => warn!("monitor_active_ports is unexpectedly returned"),
-                Err(e) => warn!(
-                    "monitor_active_ports is returned with error, e={e:?}. May be shutting down."
-                ),
-            };
+                match ret {
+                    Ok(()) => warn!("monitor_active_ports is unexpectedly returned"),
+                    Err(e) => warn!(
+                        "monitor_active_ports is returned with error, e={e:?}. May be shutting down."
+                    ),
+                };
+                tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+            }
         });
 
         Ok(())
