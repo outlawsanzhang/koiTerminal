@@ -21,7 +21,9 @@ while ! BREW_PROXY_NONINTERACTIVE=1 /usr/bin/brew-proxy install -y screen tmux; 
 ujust dns-selector resolver resolved
 
 # Set up group for koiTerminal systemd services
-groupadd koi-services
+groupadd --system koi-services
+# Set up group for GUI login without passwd
+groupadd --system nopasswdlogin
 
 # https://secureblue.dev/post-install
 echo -e 'y\ny\nn' | ujust set-kargs-hardening

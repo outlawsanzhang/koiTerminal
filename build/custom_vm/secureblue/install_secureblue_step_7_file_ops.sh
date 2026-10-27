@@ -14,6 +14,7 @@ for SYSTEM in nbd0-sys0/root/ostree/deploy/fedora/deploy/*/etc/systemd/system; d
     mkdir -p "$SYSTEM/network.target.wants/"
     ln -s /etc/systemd/system/koi-tun2proxy.path "$SYSTEM/network.target.wants/"
     ln -s /etc/systemd/system/koi-vm-manager.service "$SYSTEM/network.target.wants/"
+    ln -s /etc/systemd/system/koi-koi-nopasswdlogin.service "$SYSTEM/network.target.wants/"
 done
 # Clean up
 umount nbd0-sys0
