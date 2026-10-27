@@ -6,19 +6,19 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.94"
-rsbinder = { version = "0.10", features = ["tokio", "async", "rpc-vsock", "android_16_plus"] }
+rsbinder = { version = "0.12", features = ["tokio", "async", "rpc-vsock", "android_16_plus"] }
 env_logger = "0.11.5"
 forwarder_guest_launcher = { path = "../forwarder_guest_launcher" }
 forwarder = { path = "../../libs/libforwarder" }
 libc = "0.2.159"
 log = "0.4.22"
 shutdown_runner = { path = "../shutdown_runner" }
-tokio = { version = "1.40.0", features = ["rt-multi-thread"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "fs"] }
 vsock = "0.5.1"
 async-trait = "0.1"
 
 [build-dependencies]
-rsbinder-aidl = { version = "0.10", features = ["async"] }
+rsbinder-aidl = { version = "0.12", features = ["async"] }
 
 [package.metadata.deb]
 maintainer = "ferrochrome-dev@google.com"

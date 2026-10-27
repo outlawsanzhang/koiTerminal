@@ -26,16 +26,16 @@ use guest_agent::GuestAgent;
 // use debian_aidl_interface::binder::Strong;
 use aidl::android::system::virtualmachineservice::IVirtualMachineService::IVirtualMachineService;
 use crate::debian_service::DebianService;
-use crate::debian_service::KoiService;
+use crate::debian_service::{KoiService, PROTOCOL_V2};
 use anyhow::{Context, Result};
-use rsbinder::rpc::{RpcSession, wire_android13::PROTOCOL_V2};
+use rsbinder::rpc::{RpcSession, transport::VsockTransport};
 use vsock::VMADDR_CID_HOST;
 use std::{panic, thread, time};
 use std::process::exit;
 use std::sync::Arc;
 use log::{error, warn, info};
 
-fn wrap_error<T>(message: &str) -> impl Fn(T) -> Status
+fn binder_err<T>(message: &str) -> impl Fn(T) -> Status
 where T: std::error::Error
 {
     let message_str = message.to_string();
@@ -64,34 +64,29 @@ pub fn umask(umask: u32) {
 }
 
 fn get_vms_rpc_binder(death_recipient: Arc<DeathReporter>) -> Result<(RpcSession, Strong<dyn IVirtualMachineService>)> {
-    let vsock_port = vsock::get_local_cid().context("Could not determine local CID")?;
-    info!("Starting service with cid={vsock_port}");
+    let vsock_cid = vsock::get_local_cid().context("Could not determine local CID")?;
+    let vsock_port = vsock_cid;
+    info!("Starting guest agent with cid={vsock_cid}");
 
-    let socket = "/tmp/linux_vm_manager/IVMS.socket";
-    info!("Launching socat {socket} <> VSOCK-CONNECT:{VMADDR_CID_HOST}:{vsock_port}");
-    std::fs::remove_file(socket).ok();
-    std::process::Command::new("socat")
-        .arg("-d0")
-        .arg(format!("UNIX-LISTEN:{socket},reuseaddr,fork"))
-        .arg(format!("VSOCK-CONNECT:{VMADDR_CID_HOST}:{vsock_port}"))
-        .spawn()
-        .map_err(wrap_error("Could not spawn socat"))?;
-    info!("Launched socat");
-    info!("Sleeping 0.5s...");
-    thread::sleep(time::Duration::from_millis(500));
-    info!("Negotiating protocol and max threads");
-    let session = RpcSession::setup_unix_client_android13plus(socket, PROTOCOL_V2)
-        .map_err(wrap_error("Could not connect to IVirtualMachineService"))?;
+    // rsbinder now supports android/vsock.
+    let session = (|| {
+        info!("Connecting to host...");
+        let transport = VsockTransport::connect(VMADDR_CID_HOST, vsock_port)?;
+        info!("Launching android16+ session...");
+        RpcSession::connect_android13plus(Box::new(transport), PROTOCOL_V2)
+    })().map_err(binder_err("Could not connect to IVirtualMachineService"))?;
+
+
+    info!("Negotiating max threads");
     session.negotiate(1).map_err(|e| warn!("Could not negotiate max threads for IVirtualMachineService: {e:?}")).ok();
-    info!("Completed negotiating protocol and max threads");
     info!("Obtaining binder for IVirtualMachineService");
     let binder = session
-        .get_root().map_err(wrap_error("Could not get binder for IVirtualMachineService"))?;
+        .get_root().map_err(binder_err("Could not get binder for IVirtualMachineService"))?;
     info!("Obtained binder for IVirtualMachineService");
     binder.link_to_death_arc(&death_recipient).map_err(|e| warn!("Could not link to death recipient: {e:?}")).ok();
     info!("Obtaining IVirtualMachineService");
     let iface: Strong<dyn IVirtualMachineService> = <dyn IVirtualMachineService as FromIBinder>::try_from(binder)
-        .map_err(wrap_error("Could not cast binder to interface IVirtualMachineService"))?;
+        .map_err(binder_err("Could not cast binder to interface IVirtualMachineService"))?;
     info!("Obtained IVirtualMachineService");
     Ok((session, iface))
 }

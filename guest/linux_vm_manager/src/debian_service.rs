@@ -15,6 +15,7 @@
 use anyhow::anyhow;
 use rsbinder::*;
 use crate::aidl;
+use crate::binder_err;
 use {
     aidl::com::android::virtualization::debian::aidl::{
         IDebianService::{BnDebianService, IDebianService, VSOCK_PORT},
@@ -26,7 +27,7 @@ use {
 };
 use forwarder::stream::AsyncForwarderSession;
 use log::{debug, error, info, warn};
-use rsbinder::rpc::{RpcServer, wire_android13::PROTOCOL_V2};
+use rsbinder::rpc::RpcServer;
 use std::collections::{BTreeMap, HashSet};
 use std::collections::btree_map::Entry as BTreeMapEntry;
 use std::future::Future;
@@ -40,9 +41,11 @@ use tokio::task;
 use vsock::VsockListener;
 
 static MANAGED_PORTS: LazyLock<Mutex<HashSet<u16>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+pub static PROTOCOL_V2: u32 = 2;
 
 pub struct DebianService {
-    rt: Runtime,
+    rt: Arc<Runtime>,
+    vsock_cid: u32,
 }
 
 impl Interface for DebianService {}
@@ -50,28 +53,23 @@ impl Interface for DebianService {}
 impl DebianService {
     pub fn new_rpc_server() -> Arc<RpcServer> {
         let rt = create_tokio_runtime();
-        let service = DebianService { rt };
+        let vsock_cid = vsock::get_local_cid().expect("Could not determine local CID");
+        let service = DebianService { rt: Arc::new(rt), vsock_cid };
 
         let binder = BnDebianService::new_binder_with_features(service, BinderFeatures::default());
 
+        // rsbinder now supports android/vsock.
         let vsock_port: u32 = VSOCK_PORT.try_into().unwrap();
-        let socket = "/tmp/linux_vm_manager/IDS.socket";
-        std::fs::remove_file(socket).ok();
-        info!("Setting up debian service rpc server at {socket}");
-        let server = RpcServer::setup_unix_server(socket)
-            .inspect_err(|e| error!("Failed to start debian service rpc server at {socket}: {e}")).unwrap();
+        info!("Setting up debian service rpc server at vsock {vsock_cid}:{vsock_port}");
+        let server = RpcServer::setup_vsock_server(vsock_cid, vsock_port) // no loopback allowed
+            .inspect_err(|e| error!("Failed to start debian service rpc server at {vsock_cid}:{vsock_port}: {e}")).unwrap();
+        info!("Setting up android16+ sessions");
         server.set_android13plus(PROTOCOL_V2);
-        if let Err(e) = std::process::Command::new("socat")
-            .arg("-d0")
-            .arg(format!("VSOCK-LISTEN:{vsock_port},reuseaddr,fork"))
-            .arg(format!("UNIX-CONNECT:{socket}"))
-            .spawn() {
-            error!("Could not spawn socat VSOCK-LISTEN:{vsock_port} <> {socket}: {e:?}");
-        }
-        info!("Spawned socat VSOCK-LISTEN:{vsock_port} <> {socket}");
+        info!("Negotiating max threads");
         server.set_max_threads(4);
-        server.set_root(binder.as_binder());
-        server.run_background();
+        info!("Running in background");
+        server.set_root(binder.as_binder()).expect("Failed to populate debian service root");
+        server.run_background(); // dedicated thread outside tokio
         server
     }
 }
@@ -232,6 +230,7 @@ impl IDebianService for DebianService {
 type SharedIkoiHostCallback = Arc<Mutex<Strong<dyn IkoiHostCallback>>>;
 pub struct KoiService {
     rt: Runtime,
+    vsock_cid: u32,
     // First mutex is for registering / cloning it, second mutex is for using it
     callback: Mutex<Option<SharedIkoiHostCallback>>,
     registered_ports: Mutex<BTreeMap<u16, task::JoinHandle<Result<()>>>>,
@@ -286,8 +285,10 @@ impl TcpListeners {
 impl KoiService {
     pub fn new_rpc_server() -> std::sync::Arc<RpcServer> {
         let rt = create_tokio_runtime();
+        let vsock_cid = vsock::get_local_cid().expect("Could not determine local CID");
         let service = KoiService {
             rt,
+            vsock_cid,
             callback: Mutex::new(None),
             registered_ports: Mutex::new(BTreeMap::new()),
             set_time_busy: Arc::new(Mutex::new(false)),
@@ -296,24 +297,18 @@ impl KoiService {
 
         let binder = BnIkoiService::new_binder(service);
 
+        // rsbinder now supports android/vsock.
         let vsock_port: u32 = KOI_VSOCK_PORT.try_into().unwrap();
-        let socket = "/tmp/linux_vm_manager/IkS.socket";
-        std::fs::remove_file(socket).ok();
-        info!("Setting up koi service rpc server at {socket}");
-        let server = RpcServer::setup_unix_server(socket)
-            .inspect_err(|e| error!("Failed to start debian service rpc server at {socket}: {e}")).unwrap();
+        info!("Setting up koi service rpc server at vsock {vsock_cid}:{vsock_port}");
+        let server = RpcServer::setup_vsock_server(vsock_cid, vsock_port) // no loopback allowed
+            .inspect_err(|e| error!("Failed to start koi service rpc server at {vsock_cid}:{vsock_port}: {e}")).unwrap();
+        info!("Setting up android16+ sessions");
         server.set_android13plus(PROTOCOL_V2);
-        if let Err(e) = std::process::Command::new("socat")
-            .arg("-d0")
-            .arg(format!("VSOCK-LISTEN:{vsock_port},reuseaddr,fork"))
-            .arg(format!("UNIX-CONNECT:{socket}"))
-            .spawn() {
-            error!("Could not spawn socat VSOCK-LISTEN:{vsock_port} <> {socket}: {e:?}");
-        }
-        info!("Spawned socat VSOCK-LISTEN:{vsock_port} <> {socket}");
+        info!("Negotiating max threads");
         server.set_max_threads(4);
-        server.set_root(binder.as_binder());
-        server.run_background();
+        info!("Running in background");
+        server.set_root(binder.as_binder()).expect("Failed to populate koi service root");
+        server.run_background(); // dedicated thread outside tokio
         server
     }
 
@@ -353,10 +348,8 @@ impl KoiService {
 
     // Must not be called in task::spawn() threads
     async fn run_reverse_connection_listener_blocking(
-        port: u16, callback: SharedIkoiHostCallback,
+        vsock_cid: u32, port: u16, callback: SharedIkoiHostCallback,
     ) -> Result<()> {
-        let vsock_cid = vsock::get_local_cid()
-            .inspect_err(|e| error!("Could not determine local CID"))?;
         let mut listeners = TcpListeners::bind(port).await?;
         let vlistener = VsockListener::bind_with_cid_port(vsock_cid, port.into())
             .inspect_err(|e| error!("Cannot listen to vsock port {vsock_cid}:{port}: {e}"))?;
@@ -395,8 +388,9 @@ impl KoiService {
         if let BTreeMapEntry::Vacant(o) = registered_ports.entry(vsock_port) {
             if !managed_ports.contains(&vsock_port) {
                 managed_ports.insert(vsock_port);
+                let vsock_cid = self.vsock_cid;
                 o.insert(self.rt.spawn_blocking(move || tokio::runtime::Handle::current().block_on(
-                    Self::run_reverse_connection_listener_blocking(vsock_port, callback)
+                    Self::run_reverse_connection_listener_blocking(vsock_cid, vsock_port, callback)
                 )));
                 return Ok(())
             }
