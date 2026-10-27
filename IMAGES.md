@@ -12,11 +12,11 @@ Hats off to their very recent ARM support.
 
 ### Known issues
 > [!IMPORTANT]
-> Due to kernel version issues, the default boot option will not work on some devices (such as the 8-th generation Pixels).
-> If Secureblue does not boot, please use the serial terminal to select the second boot option (labeled `ostree:1`),
-> which uses an older kernel. Afterwards, run `echo rpm-ostree cleanup --pending | run0` to remove the incompatible option.
+> Due to kernel version issues, a Long-Term Support kernel version compiled by a Fedora maintainer for Fedora is used.
+> Please see [COPR project page](https://copr.fedorainfracloud.org/coprs/kwizart/kernel-longterm-6.18/) and [maintainer](https://copr.fedorainfracloud.org/coprs/kwizart/).
+> This does add an extra trusted party and would require manual maintenance to, for example, switch to a COPR for a newer kernel LTS branch.
 > 
-> Note that using the older kernel is a security degredation that introduces 1+ year (and counting) of unpatched vulnerability.
+> An improvement over the previous situation is, these kernel packages follow the latest LTS updates, so they are no longer subject to years of known vulnerabilities.
 
 1. Automatic VM shutdown has a terribly short timeout (5 seconds). Please shutdown within the VM after use (`run0 poweroff`).
 1. Display does not work.
@@ -26,7 +26,7 @@ Hats off to their very recent ARM support.
 ### Tips
 1. Please follow the [post-install recommendations](https://secureblue.dev/post-install) (displayed in the terminal on first boot as well),
    especially [setting up a separate admin account](https://secureblue.dev/post-install#wheel).
-1. The automatic updates are large and may consume a lot of mobile data if not on WiFi.
+1. The automatic updates are large and may consume a lot of mobile data if not on WiFi. And they are VERY SLOW.
 1. For your convenience, the disks are split between `secureblue-system.qcow2`, `secureblue-var.qcow2`, and `secureblue-home.qcow2`.
    It is possible to duplicate the latter and install different software on different user disks,
    potentially with some software airgapped.
@@ -35,6 +35,12 @@ Hats off to their very recent ARM support.
    so making `-system` read-only does not work yet.
    Additionally, please note that Secureblue does not claim to provide anonymity or anti-fingerprinting benefits,
    and desktop Linux is generally bad at sandboxing.
+1. To switch to another LTS kernel branch (for example 6.18 on Fedora 44, which will become supported one day), you can use the following (in run0) and reboot:
+```
+dnf copr disable kwizart/kernel-longterm-6.12
+dnf copr enable kwizart/kernel-longterm-6.18 fedora-44-aarch64 -y
+rpm-ostree uninstall kernel-longterm{,-core,-modules,-modules-extra} $(echo --install" "kernel-longterm{,-core,-modules,-modules-extra})
+```
 
 ### VM image
 - [:dvd: image](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026091900/images.tar.gz)

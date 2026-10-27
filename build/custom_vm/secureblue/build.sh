@@ -18,13 +18,14 @@ check_sudo() {
 }
 
 parse_options() {
-    while getopts "W:s:" option; do
+    while getopts "W:s" option; do
         case ${option} in
             W)
                 workdir="${OPTARG%/}"
                 ;;
             s)
-                startfrom="${OPTARG}"
+                echo "Starting from step: "
+                read startfrom
                 ;;
             *)
                 echo "Invalid option: $OPTARG" ; exit 1

@@ -26,22 +26,11 @@ fi
 # Prepare for grub usage
 echo "timeout=3" >> /boot/grub2/user.cfg
 
-# Deploy older kernel
-# TODO: are rpm files downloaded from koji.fedoraproject.org verified when installed?
-KVER="6.12.15"
-KTAG="200.fc41"
-pushd /dev/shm > /dev/null
-for package in kernel{,-core,-modules,-modules-core,-modules-extra}; do
-    wget "https://kojipkgs.fedoraproject.org//packages/kernel/${KVER}/${KTAG}/aarch64/${package}-${KVER}-${KTAG}.aarch64.rpm"
-done
-popd > /dev/null
-rpm-ostree override replace /dev/shm/kernel{,-core,-modules,-modules-core,-modules-extra}-"${KVER}-${KTAG}.aarch64.rpm"
+# Deploy LTS kernel
+# dnf copr enable kwizart/kernel-longterm-6.18 fedora-44-aarch64 # this does not work yet as of 2026 Oct.
+while ! dnf copr enable kwizart/kernel-longterm-6.12 fedora-43-aarch64 -y; do sleep 5; done
+while ! rpm-ostree override remove kernel{,-core,-modules,-modules-extra} $(echo "--install kernel-longterm"{,-core,-modules,-modules-extra}) --install gnome-remote-desktop; do sleep 5; done
 ostree admin status
 rpm-ostree status
 
-# Alt: install kernel from file
-# mount /dev/vde /mnt
-# rpm-ostree override replace /mnt/kernel-*.rpm
-# To revert, run: rpm-ostree override reset kernel{,-core,-modules,-modules-core,-modules-extra}
-# See: https://discussion.fedoraproject.org/t/dracut-and-ostree/731/5
 
