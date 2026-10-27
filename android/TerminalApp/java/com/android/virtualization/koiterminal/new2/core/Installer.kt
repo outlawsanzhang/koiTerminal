@@ -173,6 +173,7 @@ object Installer {
         } catch (e: CancellationException) {
             handleCancellation()
         }
+        updateCidata(lazy = false)
     }
 
     fun cancelInstall() {
@@ -288,6 +289,7 @@ object Installer {
         if (installedImage.isInstalled()) {
             Log.i("Installer", "installedImage.isCompatible() = ${installedImage.isCompatible(context)}")
             if (installedImage.isCompatible(context)) {
+                updateCidata(lazy = true)
                 _installState.value = InstallState.Installed
             } else {
                 try {
@@ -315,6 +317,17 @@ object Installer {
                 retryCount++
                 delay(1000)
             }
+        }
+    }
+
+    private fun updateCidata(lazy: Boolean = false) {
+        val cidata = installedImage.cidataUpdating(context)
+        Log.i("Installer", "cidata updating scheme: CidataUpdating.${cidata}")
+        when (cidata) {
+            InstalledImage.CidataUpdating.Main -> {
+                ImageArchive.getDefault().installCidataTo(context, installedImage.installDir, lazy = lazy)
+            }
+            else -> {}
         }
     }
 

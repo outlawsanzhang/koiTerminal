@@ -21,6 +21,7 @@ import android.os.Environment
 import android.util.Log
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
 import java.io.BufferedInputStream
+import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
@@ -139,6 +140,13 @@ internal class ImageArchive {
         }
     }
 
+    fun isAssetOutdated(context: Context, srcAssetFileName: String, dstDir: Path): Boolean {
+        val src = File(context.packageManager.getApplicationInfo(context.packageName, 0).sourceDir) // app update time
+        val dst = dstDir.resolve(srcAssetFileName).toFile() // cidata modify time
+        Log.d(TAG, "cidata freshness: last modified: apk ${src.lastModified()} cidata.iso ${dst.lastModified()}")
+        return src.exists() && src.lastModified() > dst.lastModified()
+    }
+
     /**
      * Installs this ImageArchive to a directory pointed by path. filter can be supplied to provide
      * an additional input stream which will be used during the installation.
@@ -222,6 +230,25 @@ internal class ImageArchive {
                 }
             }
         awaitClose { job.cancel() }
+    }
+
+    /**
+     * Installs bundled cidata to a directory pointed by path.
+     */
+    fun installCidataTo(
+        context: Context,
+        dir: Path,
+        lazy: Boolean = false,
+    ) {
+        try {
+            val installedCidata = dir.resolve(CIDATA_NAME)
+            if (!lazy || isAssetOutdated(context, CIDATA_NAME, dir)) {
+                Log.d(TAG, "Updating cidata with bundled $CIDATA_NAME")
+                copyAsset(context, CIDATA_NAME, dir)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Updating cidata $CIDATA_NAME failed", e)
+        }
     }
 
     @Throws(IOException::class)

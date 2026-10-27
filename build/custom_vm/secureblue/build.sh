@@ -249,8 +249,7 @@ execute_step 8 step_8 7_files # reuses checkpoint
 # ==============================================================================
 DESCRIPTION="Step 9: Build cidata.iso."
 step_9() {
-    chmod a+rx ../cidata/root_files/usr/local/bin/{linux_vm_manager,tun2proxy-bin}
-    genisoimage -output cidata.iso -V cidata -J -R ../cidata/
+    bash ../cidata/.build-me.sh "$PWD/cidata.iso"
 
     # pack up image
     IMAGE_CONTENT="build_id vm_config.json cidata.iso cidata.build_id u-boot.bin secureblue-empty.qcow2 secureblue-home.qcow2 secureblue-var.qcow2 secureblue-system.qcow2"

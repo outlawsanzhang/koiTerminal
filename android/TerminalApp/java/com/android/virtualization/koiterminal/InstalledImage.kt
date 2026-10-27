@@ -93,6 +93,11 @@ public class InstalledImage private constructor(val installDir: Path) {
         }
     }
 
+    enum class CidataUpdating(val buildId: String) {
+        No(""),
+        Main("koi:latest"),
+    }
+
     /** The build info of the installed image */
     val buildInfo: BuildInfo? by lazy { readBuildInfo() }
 
@@ -144,7 +149,7 @@ public class InstalledImage private constructor(val installDir: Path) {
 
     private fun readCidataBuildId(): String {
         try {
-            return cidataBuildIdPath.readText()
+            return cidataBuildIdPath.readText().trim()
         } catch (e: IOException) {
             Log.d(
                 TAG,
@@ -167,6 +172,15 @@ public class InstalledImage private constructor(val installDir: Path) {
         }
         Log.d(TAG, "isCompatible = true, skipping cidata build ID verification")
         return true
+    }
+
+    fun cidataUpdating(context: Context): CidataUpdating {
+        CidataUpdating.entries.forEachIndexed { index, option ->
+            if (cidataBuildId == option.buildId) {
+                return option
+            }
+        }
+        return CidataUpdating.No
     }
 
     @Throws(IOException::class)
