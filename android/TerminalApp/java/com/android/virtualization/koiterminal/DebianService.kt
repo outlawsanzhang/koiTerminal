@@ -126,6 +126,7 @@ internal class DebianService(
     @Keep
     private class ForwarderHostCallback(private val service: IDebianService, vm: VirtualMachine) : ForwardingCallbackImpl(vm) {
         override fun onForwardingRequestReceived(guestTcpPort: Int, vsockPort: Int) {
+            // Note: now guaranteed to have accepted the vsock connection on return
             try {
                 Log.d(TAG, "service.requestForwarding($guestTcpPort, $vsockPort)")
                 service.requestForwarding(guestTcpPort, vsockPort)

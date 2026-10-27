@@ -20,10 +20,6 @@ while ! BREW_PROXY_NONINTERACTIVE=1 /usr/bin/brew-proxy install -y screen tmux; 
 # Using resolved for compatibility with tunneling over SOCKS5
 ujust dns-selector resolver resolved
 
-# socat -- linux_vm_manager uses it for now, and it runs with vsock access at boot. better not manage it with brew
-# TODO: implement vsock-tcp forwarding yourself and don't depend on socat
-while ! rpm-ostree install socat; do sleep 10; done
-
 # Set up group for koiTerminal systemd services
 groupadd koi-services
 

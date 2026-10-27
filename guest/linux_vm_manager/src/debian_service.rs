@@ -72,6 +72,38 @@ impl DebianService {
         server.run_background(); // dedicated thread outside tokio
         server
     }
+
+    fn forward_port(&self, tcp_port: u16, vsock_port: u32) -> Result<()> {
+        // Use tokio instead of assuming socat exists
+        info!("Forwarding port with tokio: TCP-CONNECT:[Ipv4Addr::LOCALHOST]:{tcp_port} <> VSOCK-LISTEN:{vsock_port}");
+        let vsock_cid = self.vsock_cid;
+        let vsock_listener = VsockListener::bind_with_cid_port(vsock_cid, vsock_port)
+            .inspect_err(|e| error!("Cannot bind vsock {vsock_cid}:{vsock_port}: {e}"))?; // listening starts here according to source code (not documented)
+        let rt = self.rt.clone();
+        self.rt.spawn(async move {
+            // accept() is blocking; spawn and move (conveniently drops to stop listening)
+            let (vsock, _) = rt.spawn_blocking(move || vsock_listener.accept()).await
+                .inspect_err(|e| error!("Cannot accept vsock connection on {vsock_cid}:{vsock_port}: {e}"))?
+                .inspect_err(|e| error!("Cannot accept vsock connection on {vsock_cid}:{vsock_port}: {e}"))?;
+            vsock.set_nonblocking(false)
+                .inspect_err(|e| error!("Cannot set vsock connection on port {vsock_port} to blocking: {e}"))?;
+            let socket = TcpStream::connect((Ipv4Addr::LOCALHOST, tcp_port)).await
+                .inspect_err(|e| error!("Cannot connect to tcp port {}:{tcp_port}: {e}", Ipv4Addr::LOCALHOST))?;
+            let socket = socket.into_std()
+                .inspect_err(|e| error!("Cannot convert tokio::net::TcpStream to std::net::TcpStream: {e}"))?;
+            socket.set_nonblocking(false)
+                .inspect_err(|e| error!("Cannot set tcp connection on port {tcp_port} to blocking: {e}"))?;
+            let session = AsyncForwarderSession::new(
+                socket.as_raw_fd(),
+                vsock.as_raw_fd(),
+                Some(vsock),
+                Some(socket),
+                tcp_port
+            );
+            session.run().await.map_err(|e| anyhow!("Error forwarding port {tcp_port}, {e:?}"))
+        });
+        Ok(())
+    }
 }
 
 fn create_tokio_runtime() -> Runtime {
@@ -87,18 +119,6 @@ fn create_tokio_runtime() -> Runtime {
 //   - Implementation of Send is not general enough
 fn force_send<F: Future + Send>(f: F) -> impl Future<Output = F::Output> + Send {
     f
-}
-
-fn forward_port(tcp_port: u16, vsock_port: u32) {
-    // Use std::process::Command which doesn't require Tokio context.
-    info!("Forwarding port with socat: TCP-CONNECT:127.0.0.1:{tcp_port} <> VSOCK-LISTEN:{vsock_port}");
-    if let Err(e) = std::process::Command::new("socat")
-        .arg(format!("TCP-CONNECT:127.0.0.1:{tcp_port}"))
-        .arg(format!("VSOCK-LISTEN:{vsock_port}"))
-        .spawn()
-    {
-        error!("Failed to launch socat with port forwarding mode, tcp_port={tcp_port}, vsock_port={vsock_port}, err={e:?}");
-    }
 }
 
 impl IDebianService for DebianService {
@@ -143,12 +163,12 @@ impl IDebianService for DebianService {
         Ok(())
     }
 
+    /// Note: now guaranteed to have accepted the vsock connection on return
     fn requestForwarding(&self, guest_tcp_port: i32, vsock_port: i32) -> BinderResult<()> {
         let tcp_port = guest_tcp_port
             .try_into()
             .expect("Failed to call requestForwarding(): {guest_tcp_port} out of range");
-        forward_port(tcp_port, vsock_port as u32);
-        Ok(())
+        self.forward_port(tcp_port, vsock_port as u32).map_err(binder_err("Port forwarding error"))
     }
 
     fn requestStorageBalloon(&self, _available_bytes: i64) -> BinderResult<()> {

@@ -774,17 +774,16 @@ fn spawn_forwarder_session(
 
     // Ask guest to connect.
     info!("forwarder_host setting up guest connection: VSOCK-LISTEN ({vsock_port}) > TCP-CONNECT ({tcp4_port})");
-    let jni_h = jni_h.clone();
-    jni_h.clone().lock().unwrap().onForwardingRequestReceived(tcp4_port as i32, vsock_port as i32)?;
-
-    rt.clone().spawn(async move {
-        // brief wait for socat to come online
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
+    let vsock_rawfd = {
+        let mut jni_h = jni_h.lock().unwrap();
+        // Note: now guaranteed to have accepted the vsock connection on return
+        jni_h.onForwardingRequestReceived(tcp4_port as i32, vsock_port as i32)?;
         // Connect from host and assume that the guest is listening on the vsock.
         info!("forwarder_host setting up connection: TCP-LISTEN ({tcp4_port}) > VSOCK-CONNECT ({vsock_port})");
-        let vsock_rawfd = jni_h.lock().unwrap().hostConnectVsock(vsock_port.into())?;
+        jni_h.hostConnectVsock(vsock_port.into())?
+    };
 
+    rt.clone().spawn(async move {
         // The original workflow of listening for vsock connection does not apply.
         // Simply try connecting the vsock.
         // Safety: fd only used in rust, and closing in jni is called when done, and specified not handling closing

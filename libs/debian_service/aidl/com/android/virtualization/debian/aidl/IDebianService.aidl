@@ -22,7 +22,7 @@ interface IDebianService {
     const long VSOCK_PORT = 4000;
 
     oneway void setVmActivePortListener(IVmActivePortListener listener);
-    oneway void requestForwarding(int guestTcpPort, int vsockPort);
+    void requestForwarding(int guestTcpPort, int vsockPort);
     oneway void requestStorageBalloon(long availableBytes);
 
     /**
