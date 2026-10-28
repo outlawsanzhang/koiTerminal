@@ -73,6 +73,18 @@ impl DebianService {
         server
     }
 
+    /// Note: if multiple processes listen on different loopback addresses on the same port,
+    /// such as one on 127.0.0.1:8080, one on 127.123.45.67:8080, and one on [::1]:8080,
+    /// it will probably cause undefined behavior on a lot of software but it is technically allowed.
+    /// 
+    /// Currently we keep upstream decision to only connect to 127.0.0.1.
+    /// If some application decides to listen only on ::1, or only on 127.x.x.x other than 127.0.0.1,
+    /// this code will not connect.
+    async fn try_tcp_connect_loopback(tcp_port: u16) -> tokio::io::Result<TcpStream> {
+        TcpStream::connect((Ipv4Addr::LOCALHOST, tcp_port)).await
+            .inspect_err(|e| error!("Cannot connect to tcp port {}:{tcp_port}: {e}", Ipv4Addr::LOCALHOST))
+    }
+
     fn forward_port(&self, tcp_port: u16, vsock_port: u32) -> Result<()> {
         // Use tokio instead of assuming socat exists
         info!("Forwarding port with tokio: TCP-CONNECT:[Ipv4Addr::LOCALHOST]:{tcp_port} <> VSOCK-LISTEN:{vsock_port}");
@@ -87,8 +99,7 @@ impl DebianService {
                 .inspect_err(|e| error!("Cannot accept vsock connection on {vsock_cid}:{vsock_port}: {e}"))?;
             vsock.set_nonblocking(false)
                 .inspect_err(|e| error!("Cannot set vsock connection on port {vsock_port} to blocking: {e}"))?;
-            let socket = TcpStream::connect((Ipv4Addr::LOCALHOST, tcp_port)).await
-                .inspect_err(|e| error!("Cannot connect to tcp port {}:{tcp_port}: {e}", Ipv4Addr::LOCALHOST))?;
+            let socket = Self::try_tcp_connect_loopback(tcp_port).await?;
             let socket = socket.into_std()
                 .inspect_err(|e| error!("Cannot convert tokio::net::TcpStream to std::net::TcpStream: {e}"))?;
             socket.set_nonblocking(false)
@@ -138,11 +149,11 @@ impl IDebianService for DebianService {
                     force_send(forwarder_guest_launcher::monitor_active_ports(async move |ports| {
                         let ports_filtered: Vec<ActivePort> = ports
                             .iter()
-                            .filter(|(port, comm)|
-                                !managed_ports.contains(*port) && *comm != "linux_vm_manage" // is truncated to 16-1=15
+                            .filter(|(sock, comm)|
+                                !managed_ports.contains(&sock.port()) && *comm != "linux_vm_manage" // is truncated to 16-1=15
                             )
-                            .map(|(port, comm)| ActivePort {
-                                port: *port as i32,
+                            .map(|(sock, comm)| ActivePort {
+                                port: sock.port() as i32,
                                 comm: comm.to_string(),
                             })
                             .collect();

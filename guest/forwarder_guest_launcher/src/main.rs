@@ -20,6 +20,7 @@ use debian_service::debian_service_client::DebianServiceClient;
 use debian_service::{ActivePort, QueueOpeningRequest, ReportVmActivePortsRequest};
 use log::{debug, error};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use tokio::try_join;
 use tonic::transport::{Channel, Endpoint};
 use tonic::Request;
@@ -59,7 +60,7 @@ async fn process_forwarding_request_queue(mut client: DebianServiceClient<Channe
 }
 
 async fn send_active_ports_report(
-    listening_ports: &HashMap<u16, String>,
+    listening_ports: &HashMap<SocketAddr, String>,
     client: &mut DebianServiceClient<Channel>,
 ) -> Result<()> {
     let ports = listening_ports

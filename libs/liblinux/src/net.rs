@@ -19,15 +19,22 @@ use anyhow::{anyhow, Context, Error};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 // Parse kernel IP to IpAddr (e.g. "0100007F" -> Ipv4Addr([127, 0, 0, 1]))
 fn parse_ip_addr(ip_from_kernel: &str) -> Result<IpAddr, Error> {
     // Kernel keeps the IP address as big endian while Ipv{4,6}Addr takes native endian.
-    let ip_be = u32::from_str_radix(ip_from_kernel, 16)
-        .with_context(|| format!("Cannot parse {ip_from_kernel} to Ipv4Addr"))?;
-    let ip_ne = u32::from_be(ip_be);
-    Ok(IpAddr::V4(Ipv4Addr::from_bits(ip_ne)))
+    if ip_from_kernel.len() <= 8 {
+        let ip_be = u32::from_str_radix(ip_from_kernel, 16)
+            .with_context(|| format!("Cannot parse {ip_from_kernel} to Ipv4Addr"))?;
+        let ip_ne = u32::from_be(ip_be);
+        Ok(IpAddr::V4(Ipv4Addr::from_bits(ip_ne)))
+    } else {
+        let ip_be = u128::from_str_radix(ip_from_kernel, 16)
+            .with_context(|| format!("Cannot parse {ip_from_kernel} to Ipv4Addr"))?;
+        let ip_ne = u128::from_be(ip_be);
+        Ok(IpAddr::V6(Ipv6Addr::from_bits(ip_ne)))
+    }
 }
 
 // Parse IP string from kernel (e.g. "0100007F:1F40" -> 127.0.0.1:8000")
@@ -36,7 +43,7 @@ fn parse_socket_addr(socket_from_kernel: &str) -> Result<SocketAddr, Error> {
     let ip = parse_ip_addr(addr[0])?;
     let port = u16::from_str_radix(addr[1], 16)
         .with_context(|| format!("Cannot parse {socket_from_kernel} to SockAddr"))?;
-    Ok(SocketAddr::new(ip, port))
+    Ok(SocketAddr::new(ip, port)) // extra fields in SocketAddrV6 are zeros
 }
 
 /// Get default gateway in IPV4 as string by reading /proc/net/route
@@ -68,15 +75,10 @@ pub fn get_default_gateway() -> Result<String, Error> {
     Err(anyhow!("Cannot find default gateway"))
 }
 
-/// Get map of (port, comm) which lists listening IPv4 TCP port available from loopback
-/// This reads /proc/net/tcp, so result may vary per permission.
-pub fn get_listening_tcp4_ports_from_localhost() -> Result<HashMap<u16, String>, Error> {
+/// Get map of (port, comm) which lists listening IPv4/IP4+6 TCP port available from loopback
+/// This reads /proc/net/{tcp,tcp6}, so result may vary per permission.
+pub fn get_listening_tcp4_ports_from_localhost() -> Result<HashMap<SocketAddr, String>, Error> {
     let proc = ProcHelper::new()?;
-
-    let file = File::open("/proc/net/tcp")
-        .context("Failed to open /proc/net/tcp. Ensure this is running with Linux kernel")?;
-    let mut lines = io::BufReader::new(file).lines();
-
     // /proc/net/tcp{,6} format is stable and documented below.
     // https://www.kernel.org/doc/Documentation/networking/proc_net_tcp.txt
     const LOCAL_SOCK_ADDR_IDX: usize = 1;
@@ -86,24 +88,34 @@ pub fn get_listening_tcp4_ports_from_localhost() -> Result<HashMap<u16, String>,
     // From include/netinet/tcp.h
     const TCP_LISTEN: &str = "0A";
 
-    // Skip header validation.
-    let _ = lines.next().ok_or(anyhow!("Cannot find header from /proc/net/tcp"))?;
+    let mut entries: HashMap<SocketAddr, String> = Default::default();
 
-    let mut entries: HashMap<u16, String> = Default::default();
-    while let Some(Ok(line)) = lines.next() {
-        let items: Vec<_> = line.split_whitespace().collect();
-        if items[CONNECTION_STATE_IDX] != TCP_LISTEN {
-            continue;
+    for file in ["/proc/net/tcp", "/proc/net/tcp6"] {
+        let file = File::open(file)
+            .context(format!("Failed to open {file}. Ensure this is running with Linux kernel"))?;
+        let mut lines = io::BufReader::new(file).lines();
+
+        // Skip header validation.
+        let _ = lines.next().ok_or(anyhow!("Cannot find header from /proc/net/tcp"))?;
+
+        while let Some(Ok(line)) = lines.next() {
+            let items: Vec<_> = line.split_whitespace().collect();
+            if items[CONNECTION_STATE_IDX] != TCP_LISTEN {
+                continue;
+            }
+            let socket_addr = parse_socket_addr(items[LOCAL_SOCK_ADDR_IDX])?;
+            if !socket_addr.ip().is_loopback() && !socket_addr.ip().is_unspecified() {
+                continue;
+            }
+            if socket_addr.ip().is_ipv6() && !socket_addr.ip().is_unspecified() {
+                continue; // for ipv6, we will not be connecting to ::1, but a cross-v4-v6 any addr listen is shown as ::0
+            }
+            let comm = match proc.comm_with_inode(items[INODE_IDX].parse()?) {
+                Some(comm) => comm,
+                None => "unknown".to_string(),
+            };
+            entries.insert(socket_addr, comm.clone());
         }
-        let socket_addr = parse_socket_addr(items[LOCAL_SOCK_ADDR_IDX])?;
-        if !socket_addr.ip().is_loopback() && !socket_addr.ip().is_unspecified() {
-            continue;
-        }
-        let comm = match proc.comm_with_inode(items[INODE_IDX].parse()?) {
-            Some(comm) => comm,
-            None => "unknown".to_string(),
-        };
-        entries.insert(socket_addr.port(), comm.clone());
     }
     Ok(entries)
 }
@@ -148,7 +160,11 @@ mod tests {
 
     #[test]
     fn test_get_listening_tcp_ports() -> Result<(), Error> {
-        let mut tcp = get_listening_tcp4_ports_from_localhost()?;
+        let mut tcp = get_listening_tcp4_ports_from_localhost()?
+            .iter().filter_map(|(sock, comm)| match sock {
+                SocketAddr::V4(sock) => Some(sock.port()),
+                _ => None,
+            }).collect();
 
         let port_comm = if is_tool_available("netstat") {
             Command::new("bash")
