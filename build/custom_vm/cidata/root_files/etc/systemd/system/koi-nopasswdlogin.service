@@ -1,0 +1,62 @@
+[Unit]
+Requires=koi-namespace.service
+After=koi-namespace.service
+Description=koiTerminal check passwordless login and enable them for gnome-remote-desktop
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecCondition=+/usr/bin/grep nopasswdlogin /etc/group
+ExecStartPre=+/usr/bin/cp /etc/shadow /etc/group /run/linux_vm_manager/
+ExecStartPre=+/usr/bin/chmod 700 /run/linux_vm_manager/shadow /run/linux_vm_manager/group
+ExecStart=/usr/bin/sh -c ' \
+    set -exo pipefail; \
+    LOGINS=""; \
+    for U in $(/usr/bin/lslogins --user-accs -o USER | /usr/bin/tail -n +2 | /usr/bin/grep -v "nobody"); do \
+        if /usr/bin/test "root" != "$U" && /usr/bin/grep "^$U::" /run/linux_vm_manager/shadow; then \
+            LOGINS="$LOGINS,$U"; \
+        fi; \
+    done; \
+    /usr/bin/sed -e "s/^\\(nopasswdlogin\\(:[^:]*\\)\\{2\\}\\):.*/\\1:${LOGINS:1}/g" /run/linux_vm_manager/group > /etc/group; \
+'
+ExecStartPost=+/usr/bin/rm /run/linux_vm_manager/shadow /run/linux_vm_manager/group
+
+# Restart=on-failure
+# User=nobody
+# DynamicUser=yes
+# Group=koi-services
+# RestartSec=1s
+# RestartSteps=8
+# RestartMaxDelaySec=256s
+
+DevicePolicy=closed
+InaccessiblePaths=/run/dbus/ /run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateIPC=yes
+PrivateNetwork=yes
+ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=/etc/group
+
+
+[Install]
+WantedBy=multi-user.target
