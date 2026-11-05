@@ -25,6 +25,7 @@ import com.android.virtualization.koiterminal.ClipboardController
 import com.android.virtualization.koiterminal.DebianService
 import com.android.virtualization.koiterminal.DebianServiceBase
 import com.android.virtualization.koiterminal.DebianServiceGrpc
+import com.android.virtualization.koiterminal.InstalledImage
 import com.android.virtualization.koiterminal.PortsStateManager
 import com.android.virtualization.koiterminal.StorageBalloonWorker
 import io.grpc.InsecureServerCredentials
@@ -43,9 +44,10 @@ data class OpenPort(val port: Int, val name: String, val isForwarded: Boolean) {
 
 class GuestAgentController(
     private val context: Context,
-    private val aidlGuestAgent: Boolean,
+    private val image: InstalledImage,
     private val scope: CoroutineScope,
 ) {
+    private val aidlGuestAgent = image.isAidlGuestAgent()
     private var vm: VirtualMachine? = null
     private var server: Server? = null
     private var debianService: DebianServiceBase? = null
@@ -99,7 +101,7 @@ class GuestAgentController(
             Log.w(TAG, "GuestAgentController is started again. It might had been crashed.")
             stop() // Safely stop existing before recreating
         }
-        debianService = DebianService(context, scope, vm, guestAgent, koi_service, service)
+        debianService = DebianService(context, scope, image, vm, guestAgent, koi_service, service)
         koiService = koi_service
         clipboardController = ClipboardController(context, service)
         portsStateManager.registerListener(portsListener)
@@ -149,6 +151,9 @@ class GuestAgentController(
             Log.w(TAG, "Could not share current time with koiService.")
         }
     }
+
+    val remoteDesktop: InstalledImage.RemoteDesktop?
+        get() = image.koiConfig?.activeMachine?.remoteDesktop
 
     fun enablePortForwarding(port: Int, enable: Boolean) {
         portsStateManager.updateEnabledPort(port, enable)

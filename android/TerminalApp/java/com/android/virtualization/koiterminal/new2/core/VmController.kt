@@ -189,6 +189,9 @@ object VmController {
         }
     }
 
+    val remoteDesktop: InstalledImage.RemoteDesktop?
+        get() = _guestAgentController.value?.remoteDesktop
+
     fun start() {
         if (_vmState.value is VmState.Running || _vmState.value is VmState.Starting) return
 
@@ -203,7 +206,7 @@ object VmController {
                 val configBuilder = json.toConfigBuilder(context)
                 Log.d(TAG, "image.isAidlGuestAgent=${image.isAidlGuestAgent()}")
                 _guestAgentController.value =
-                    GuestAgentController(context, image.isAidlGuestAgent(), repositoryScope)
+                    GuestAgentController(context, image, repositoryScope)
 
                 val sharedPref =
                     context.getSharedPreferences(SettingsViewModel.PREFS_NAME, Context.MODE_PRIVATE)

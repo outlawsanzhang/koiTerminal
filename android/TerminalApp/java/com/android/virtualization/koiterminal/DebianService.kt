@@ -20,6 +20,7 @@ import android.os.RemoteException
 import android.system.virtualizationcommon.IGuestAgent
 import android.system.virtualmachine.VirtualMachine
 import android.util.Log
+import android.util.Base64
 import androidx.annotation.Keep
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.virtualization.debian.aidl.IDebianService
@@ -33,6 +34,7 @@ import com.android.virtualization.koiterminal.Socks5Setup
 import com.android.virtualization.koiterminal.new2.ui.main.NetworkConnection
 import com.android.virtualization.koiterminal.new2.ui.main.SettingsViewModel
 import com.android.virtualization.terminal.proto.ActivePort
+import java.security.SecureRandom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,6 +42,7 @@ import kotlinx.coroutines.launch
 internal class DebianService(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val image: InstalledImage,
     private val vm: VirtualMachine,
     private val guestAgent: IGuestAgent,
     private val koi_service: IkoiService?,
@@ -52,7 +55,7 @@ internal class DebianService(
                 updateListeningPorts()
             }
         }
-    private val koiService = KoiService(context, scope, vm, koi_service)
+    val koiService = KoiService(context, scope, image, vm, koi_service)
     private val vmActivePortsListener = VmActivePortsListener()
 
     init {
@@ -152,6 +155,7 @@ internal class DebianService(
 internal class KoiService(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val image: InstalledImage,
     private val vm: VirtualMachine,
     private val service: IkoiService?,
 ) {
@@ -160,8 +164,46 @@ internal class KoiService(
     init {
         service?.let { service ->
             service.registerHostCallback(callback)
+            // Remote display
+            scope.launch(Dispatchers.IO) {
+                try {
+                    // If remote display unknown, query from VM
+                    val proto = image.koiConfig?.activeMachine?.remoteDesktop?.proto
+                    if (proto != IkoiService.RD_UNKNOWN && proto != IkoiService.RD_NONE) return@launch
+                    // Generate password. Max 255+\0 for rdp, truncated 8(!!) for vnc
+                    val passBytes = ByteArray(192)
+                    SecureRandom().nextBytes(passBytes)
+                    var pass = Base64.encodeToString(passBytes, Base64.NO_WRAP or Base64.NO_PADDING or Base64.URL_SAFE) ?: ""
+                    if (pass.length != 256) {
+                        throw RuntimeException("pass length: ${pass.length} != 256")
+                    }
+                    // Query from VM
+                    val remoteDesktop = try {
+                        service.setRemoteDesktopCredentials(pass)
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Exception setting up remote display credentials", e)
+                        return@launch
+                    }
+                    Log.d(TAG, "Got remoteDesktop from VM: ${remoteDesktop.success}, ${remoteDesktop.proto}, ${remoteDesktop.port}")
+                    if (!remoteDesktop.success) return@launch
+                    // Save to KoiConfig
+                    when (remoteDesktop.proto) {
+                        IkoiService.RD_NONE -> { pass = "" }
+                        IkoiService.RD_RDP -> { pass = pass.substring(0..<255) }
+                        IkoiService.RD_VNC -> { pass = pass.substring(0..<8) } // VNC has abysmal password security. They truncate it to 8 chars.
+                        else -> { return@launch } // Do nothing. Includes IkoiService.RD_UNKNOWN
+                    }
+                    image.setRemoteDesktop(InstalledImage.RemoteDesktop(remoteDesktop.proto, remoteDesktop.port, pass))
+                    Log.d(TAG, "Current image.koiConfig: ${image.koiConfig}")
+                } catch (e: Exception) {
+                    Log.d(TAG, "Exception from setting up remote display", e)
+                }
+            }
         }
     }
+
+    val remoteDesktop: InstalledImage.RemoteDesktop?
+        get() = image.koiConfig?.activeMachine?.remoteDesktop
 
     fun getRcServicesAndSetupGuest(enableSocks5: Boolean): IntArray {
         return if (service == null) {
@@ -181,5 +223,10 @@ internal class KoiService(
         override fun requestReverseConnection(vsockPort: Int) {
             ForwarderHost.requestReverseConnection(vsockPort)
         }
+    }
+
+    companion object {
+        const val RD_SHARE_DIR = "remote_desktop"
+        const val RD_SHARE_RDP = "koi.rdp"
     }
 }

@@ -21,8 +21,11 @@ import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
 import android.util.Log
+import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import com.android.virtualization.koiterminal.MainActivity.Companion.TAG
+import com.google.gson.GsonBuilder
+import com.google.gson.InstanceCreator
 import java.io.BufferedReader
 import java.io.FileReader
 import java.io.IOException
@@ -98,6 +101,99 @@ public class InstalledImage private constructor(val installDir: Path) {
         Main("koi:latest"),
     }
 
+    data class KoiConfigBase(
+        val version: Int = 0,
+        @Transient
+        val timestamp: Long = 0,
+    )
+
+    data class KoiConfigVmV1(
+        val remoteDesktop: RemoteDesktop = RemoteDesktop(),
+    )
+
+    data class KoiConfigV1(
+        val version: Int = 0,
+        @Transient
+        val timestamp: Long = 0,
+        @Transient
+        val active: Int = 0,
+        val machines: List<KoiConfigVmV1> = listOf(),
+    ) {
+        val activeMachine: KoiConfigVmV1?
+            get() = machines.get(active)
+
+        /// Returns null if index is invalid
+        fun editMachine(index: Int?, map: (KoiConfigVmV1) -> KoiConfigVmV1): KoiConfigV1? {
+            val index = index ?: active
+            machines.get(index)?.let {
+                // Keep everything but the one at [idx], change its remoteDesktop
+                val machines = machines.mapIndexed { idx, value ->
+                    if (idx == index) map(value)
+                    else value
+                }
+                return this.copy(machines = machines)
+            }
+            return null
+        }
+
+        fun saveTo(configPath: Path) {
+            Files.write(configPath, gson.toJson(this).toByteArray())
+        }
+
+        companion object {
+            private val gson = GsonBuilder()
+                .setPrettyPrinting()
+                // .registerTypeAdapter(KoiConfigV1::class.java, InstanceCreator)
+                .create()
+
+            fun readFromPath(configPath: Path): KoiConfigV1 {
+                val parsed = try {
+                    val content = Files.readAllBytes(configPath).decodeToString()
+                    val base = gson.fromJson(content, KoiConfigBase::class.java)
+                    when (base.version) {
+                        1 -> gson.fromJson(content, KoiConfigV1::class.java)
+                        else -> throw IllegalArgumentException("koi_config.json version unrecognized: ${base.version}")
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Failed to load $configPath", e)
+                    throw e
+                }
+                // Invalidation checks
+                if (parsed == null) {
+                    throw IllegalArgumentException("koi_config.json parsing returns null")
+                }
+                if (parsed.machines.size == 0) {
+                    throw IllegalArgumentException("koi_config.json defines no machine")
+                }
+                // Passed checks. update modify time
+                return parsed.copy(timestamp = Files.getLastModifiedTime(configPath).toMillis())
+            }
+
+            fun getDefault(): KoiConfigV1 {
+                return KoiConfigV1(
+                    version = 1,
+                    timestamp = 0,
+                    active = 0,
+                    machines = listOf(
+                        KoiConfigVmV1(
+                            remoteDesktop = RemoteDesktop(
+                                proto = 0,
+                                port = 0,
+                                pass = ""
+                            ),
+                        )
+                    ),
+                )
+            }
+        }
+    }
+
+    data class RemoteDesktop( // See IkoiService.aidl
+        val proto: Int = 0,
+        val port: Int = 0,
+        val pass: String = "",
+    )
+
     /** The build info of the installed image */
     val buildInfo: BuildInfo? by lazy { readBuildInfo() }
 
@@ -107,6 +203,48 @@ public class InstalledImage private constructor(val installDir: Path) {
             return field
         }
         private set
+
+    var _koiConfig: KoiConfigV1? = null
+    var koiConfig: KoiConfigV1
+        get() {
+            val configPath: Path = installDir.resolve(KOI_CONFIG_FILENAME)
+            val result = if (!Files.exists(configPath)) {
+                KoiConfigV1.getDefault()
+            } else {
+                val mtime = try {
+                    Files.getLastModifiedTime(configPath).toMillis()
+                } catch (e: Exception) {
+                    0
+                }
+                val _koiConfigNow = _koiConfig
+                if (_koiConfigNow != null && _koiConfigNow.timestamp >= mtime) {
+                    return _koiConfigNow
+                }
+                KoiConfigV1.readFromPath(configPath)
+            }
+            _koiConfig = result
+            return result
+        }
+        private set(value) {
+            if (value == null) return
+            val configPath: Path = installDir.resolve(KOI_CONFIG_FILENAME)
+            value.saveTo(configPath)
+            _koiConfig = value.copy(timestamp = Files.getLastModifiedTime(configPath).toMillis())
+        }
+
+    public fun setRemoteDesktop(remoteDesktop: RemoteDesktop, index: Int? = null): Boolean {
+        try {
+            val newConfig = koiConfig.editMachine(index) {
+                it.copy(remoteDesktop = remoteDesktop)
+            }
+            if (newConfig == null) return false
+            koiConfig = newConfig
+            return true
+        } catch (e: Exception) {
+            Log.d(TAG, "Failed to set remoteDesktop", e)
+            return false
+        }
+    }
 
     /** Tests if this InstalledImage uses the root partition file. */
     fun hasRootPart(): Boolean {
@@ -297,6 +435,7 @@ public class InstalledImage private constructor(val installDir: Path) {
         private const val BUILD_ID_FILENAME = "build_id"
         const val CIDATA_BUILD_ID_FILENAME = "cidata.build_id"
         const val MARKER_FILENAME: String = "completed"
+        const val KOI_CONFIG_FILENAME: String = "koi_config.json"
 
         const val RESIZE_STEP_BYTES: Long = 4 shl 20 // 4 MiB
         const val RELEASE_YEAR: Int = 2025
