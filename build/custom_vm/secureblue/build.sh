@@ -181,7 +181,7 @@ execute_step 2 step_2 2_switch
 # echo "Boot 3: Secureblue from disk. Configure Secureblue in QEMU by running" \
 #      "/home/droid/run_install_secureblue.sh in .bash_profile."
 # echo
-# VDD_ARGS="if=virtio,file=install_secureblue_step_3_config.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
+# VDD_ARGS="if=virtio,file=install_secureblue_step_3.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
 #     boot_qemu
 # qemu-img snapshot -c 3_config secureblue-sys0.qcow2
 # qemu-img snapshot -c 3_config secureblue-var0.qcow2
@@ -194,7 +194,7 @@ DESCRIPTION="Boot 4: Secureblue from disk. Install packages and set Secureblue
     kernel arguments in QEMU by running /home/droid/run_install_secureblue.sh
     in .bash_profile."
 step_4() {
-    VDD_ARGS="if=virtio,file=install_secureblue_step_4_kargs.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
+    VDD_ARGS="if=virtio,file=install_secureblue_step_4.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
         boot_qemu
 }
 execute_step 4 step_4 4_kargs
@@ -204,7 +204,7 @@ DESCRIPTION="Boot 5: Secureblue from disk. Install alt kernel in QEMU by running
     /home/droid/run_install_secureblue.sh in .bash_profile.
     This takes hours. Good luck."
 step_5() {
-    VDD_ARGS="if=virtio,file=install_secureblue_step_5_check_kernel.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
+    VDD_ARGS="if=virtio,file=install_secureblue_step_5.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
         boot_qemu
 }
 execute_step 5 step_5 5_check_kernel
@@ -213,7 +213,7 @@ execute_step 5 step_5 5_check_kernel
 DESCRIPTION="Boot 6: Secureblue from disk. Clean up in QEMU by running
     /home/droid/run_install_secureblue.sh in .bash_profile."
 step_6() {
-    VDD_ARGS="if=virtio,file=install_secureblue_step_6_cleanup.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
+    VDD_ARGS="if=virtio,file=install_secureblue_step_6.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
         boot_qemu
 }
 execute_step 6 step_6 6_cleanup
