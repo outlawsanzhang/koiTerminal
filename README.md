@@ -95,6 +95,10 @@ These goals may change, and they may or may not be achievable. We will have to s
     - https://man7.org/linux/man-pages/man5/semanage.conf.5.html
     - git clone secureblue to get their policies
     - modify /etc/selinux/semanage.conf to set policydb version
+    - [ ] Checklist
+        - [ ] check everything you touched (use git diff...) and add here
+        - [ ] check file permissions again
+            - [ ] /run/linux_vm_manager, /tmp/linux_vm_manager, /etc/systemd/system/koi-*
 - [ ] FIXME for Secureblue image
     - [X] Support port-forwarding and network proxies out-of-the-box
     - [ ] fix audio. sometime there's a loud noise during shutdown
