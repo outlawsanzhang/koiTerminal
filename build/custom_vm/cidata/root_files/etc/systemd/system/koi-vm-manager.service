@@ -49,4 +49,4 @@ ReadWritePaths=
 
 
 [Install]
-WantedBy=network.target
+WantedBy=multi-user.target

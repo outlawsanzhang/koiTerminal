@@ -99,7 +99,7 @@ else:
 if not os.path.exists(CWD + SOURCE_ISO_NAME):   
     # If not present then create it.
     print(RED + "[ Downloading ] " + WHITE + " Checking source iso file. Not found." + ORANGE)
-    cmd = "wget -O " + CWD + SOURCE_ISO_NAME + " " + MIRROR_URL + SOURCE_ISO_NAME + "  -q --show-progress"
+    cmd = "wget --progress=dot:mega -O " + CWD + SOURCE_ISO_NAME + " " + MIRROR_URL + SOURCE_ISO_NAME + "  -q --show-progress"
     os.system(cmd)
 else:
     print(GREEN + "[ Ok ]" + WHITE + " Source ISO file already exists.")

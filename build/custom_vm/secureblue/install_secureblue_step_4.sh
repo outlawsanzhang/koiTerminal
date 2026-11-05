@@ -1,11 +1,6 @@
 #!/bin/bash
-# Setting up Secureblue kernel arguments.
 
 set -ex -o pipefail
-
-# restore deleted files
-rsync -a /usr/etc/containers/policy.json /etc/containers/policy.json
-rsync -a /usr/etc/containers/registries.d/secureblue.yaml /etc/containers/registries.d/secureblue.yaml
 
 systemctl stop rpm-ostreed-automatic.timer
 systemctl stop flatpak-system-update.timer
@@ -13,21 +8,9 @@ systemctl stop brew-update.timer
 systemctl stop podman-auto-update.timer
 rpm-ostree cancel
 
-# Multi-tabbing essentials
-# Directly invoking brew-proxy
-while ! BREW_PROXY_NONINTERACTIVE=1 /usr/bin/brew-proxy install -y screen tmux; do sleep 10; done
-
-# Using resolved for compatibility with tunneling over SOCKS5
-ujust dns-selector resolver resolved
-
-# Set up group for koiTerminal systemd services
-groupadd --system koi-services
-# Set up group for GUI login without passwd
-groupadd --system nopasswdlogin
-
-# https://secureblue.dev/post-install
-echo -e 'y\ny\nn' | ujust set-kargs-hardening
-# rpm-ostree kargs --append-if-missing=module.sig_enforce=1 # this omission was fixed upstream
-# leave out --append-if-missing=ia32_emulation=0 for now
-# leave out --append-if-missing=console=hvc0 (see ks.cfg)
-
+# Deploy LTS kernel. This takes hours and should happen after all other rpm-ostree operations.
+# dnf copr enable kwizart/kernel-longterm-6.18 fedora-44-aarch64 # this does not work yet as of 2026 Oct.
+while ! dnf copr enable kwizart/kernel-longterm-6.12 fedora-43-aarch64 -y; do sleep 5; done
+while ! rpm-ostree override remove kernel{,-core,-modules,-modules-extra} $(echo "--install kernel-longterm"{,-core,-modules,-modules-extra}) --install gnome-remote-desktop; do sleep 5; done
+ostree admin status
+rpm-ostree status

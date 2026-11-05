@@ -118,6 +118,11 @@ execute_step() {
         set -x
         "$fn"
         if [ ! -z "$checkpoint" ]; then
+            echo Removing old snapshots...
+            while qemu-img snapshot -d $checkpoint secureblue-sys0.qcow2; do sleep 1; done
+            while qemu-img snapshot -d $checkpoint secureblue-var0.qcow2; do sleep 1; done
+            while qemu-img snapshot -d $checkpoint secureblue-hom0.qcow2; do sleep 1; done
+            echo Creating new snapshots...
             qemu-img snapshot -c $checkpoint secureblue-sys0.qcow2
             qemu-img snapshot -c $checkpoint secureblue-var0.qcow2
             qemu-img snapshot -c $checkpoint secureblue-hom0.qcow2
@@ -166,7 +171,8 @@ step_1() {
 execute_step 1 step_1 1_install
 
 # ==============================================================================
-DESCRIPTION="Boot 2: Silverblue from disk. Rebase into Secureblue in QEMU
+DESCRIPTION="Step 2: QEMU boot Silverblue from disk.
+    Rebase into Secureblue in QEMU
     by running /home/droid/run_install_secureblue.sh in .bash_profile."
 step_2() {
     VDD_ARGS="if=virtio,file=install_secureblue_step_2_switch.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
@@ -175,48 +181,40 @@ step_2() {
 execute_step 2 step_2 2_switch
 
 # ==============================================================================
-# # Boot 3 skipped (subsumed into boot 2)
-# echo
-# date
-# echo "Boot 3: Secureblue from disk. Configure Secureblue in QEMU by running" \
-#      "/home/droid/run_install_secureblue.sh in .bash_profile."
-# echo
-# VDD_ARGS="if=virtio,file=install_secureblue_step_3.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
-#     boot_qemu
-# qemu-img snapshot -c 3_config secureblue-sys0.qcow2
-# qemu-img snapshot -c 3_config secureblue-var0.qcow2
-# qemu-img snapshot -c 3_config secureblue-hom0.qcow2
-DESCRIPTION="Boot 3 skipped (subsumed into boot 2)"
-execute_step 3 echo 2_switch # reuses checkpoint
+DESCRIPTION="Step 3: QEMU boot Secureblue from disk.
+    Set Secureblue kernel arguments
+    by running /home/droid/run_install_secureblue.sh in .bash_profile."
+step_3() {
+    VDD_ARGS="if=virtio,file=install_secureblue_step_3.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
+        boot_qemu
+}
+execute_step 3 step_3 3_config
 
 # ==============================================================================
-DESCRIPTION="Boot 4: Secureblue from disk. Install packages and set Secureblue
-    kernel arguments in QEMU by running /home/droid/run_install_secureblue.sh
-    in .bash_profile."
+DESCRIPTION="Step 4: QEMU boot Secureblue from disk.
+    Set up LTS kernel
+    by running /home/droid/run_install_secureblue.sh in .bash_profile.
+    This takes hours. Good luck."
 step_4() {
     VDD_ARGS="if=virtio,file=install_secureblue_step_4.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
         boot_qemu
 }
-execute_step 4 step_4 4_kargs
+execute_step 4 step_4 4_config
 
 # ==============================================================================
-DESCRIPTION="Boot 5: Secureblue from disk. Install alt kernel in QEMU by running
-    /home/droid/run_install_secureblue.sh in .bash_profile.
-    This takes hours. Good luck."
-step_5() {
-    VDD_ARGS="if=virtio,file=install_secureblue_step_5.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
-        boot_qemu
-}
-execute_step 5 step_5 5_check_kernel
+DESCRIPTION="Step 5 skipped (moved to boot 4 and 6)"
+execute_step 5 echo 5_config
 
 # ==============================================================================
-DESCRIPTION="Boot 6: Secureblue from disk. Clean up in QEMU by running
-    /home/droid/run_install_secureblue.sh in .bash_profile."
+DESCRIPTION="Step 6: QEMU boot Secureblue from disk.
+    Install and configure packages, then clean up
+    by running /home/droid/run_install_secureblue.sh in .bash_profile.
+    "
 step_6() {
     VDD_ARGS="if=virtio,file=install_secureblue_step_6.sh,format=raw,cache=unsafe,discard=unmap,readonly=on,id=hd3" \
         boot_qemu
 }
-execute_step 6 step_6 6_cleanup
+execute_step 6 step_6 6_config
 
 # ==============================================================================
 DESCRIPTION="Step 7: Direct filesystem manipulations."
@@ -245,7 +243,7 @@ step_8() {
 
     ls -l secureblue*.qcow2 sparse
 }
-execute_step 8 step_8 7_files # reuses checkpoint
+execute_step 8 step_8 8_echo # reuses checkpoint
 
 # ==============================================================================
 DESCRIPTION="Step 9: Build cidata.iso."
