@@ -16,6 +16,13 @@ for SYSTEM in nbd0-sys0/root/ostree/deploy/fedora/deploy/*/etc/systemd/system; d
     ln -s /etc/systemd/system/koi-tun2proxy.path "$SYSTEM/network.target.wants/"
     ln -s /etc/systemd/system/koi-vm-manager.service "$SYSTEM/multi-user.target.wants/"
     ln -s /etc/systemd/system/koi-nopasswdlogin.service "$SYSTEM/multi-user.target.wants/"
+    ln -s /etc/systemd/system/koi-grdctl-creds.path "$SYSTEM/multi-user.target.wants/"
+    # Set up koiTerminal configs
+    CONF="$SYSTEM/../../koi.conf.d"
+    mkdir -p "$CONF"
+    echo "3389" > "$CONF/rdp-port.marker"
+    chmod -R 644 "$CONF"
+    chmod -R a+X "$CONF" # +x on folders only
 done
 
 # Clean up

@@ -1,0 +1,9 @@
+[Unit]
+Description=koiTerminal gnome-remote-desktop credential setter trigger
+Requires=koi-vm-manager.service
+
+[Path]
+PathExists=/run/linux_vm_manager/koi-grdctl-creds.pipe
+
+[Install]
+WantedBy=multi-user.target

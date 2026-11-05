@@ -23,10 +23,20 @@ interface IkoiService {
     const long SOCKS5_PORT = 10805;
     const int TTY_TTYS0 = 0;
     const int TTY_HVC0 = 1;
+    const int RD_UNKNOWN = 0;
+    const int RD_NONE = 1;
+    const int RD_RDP = 2;
+    const int RD_VNC = 3;
+    parcelable RemoteDisplay {
+        boolean success;
+        int proto;
+        int port;
+    }
 
     void registerHostCallback(IkoiHostCallback callback) = 1;
     boolean supportsStorageBalloon() = 2;
     void openReverseConnectedPort(int vsock_port) = 3; // should block to avoid race conditions (no `oneway`)
     void setTime(long epoch) = 4;
     void resizeTtyWindow(int target, int columns, int rows) = 5;
+    RemoteDisplay setRemoteDesktopCredentials(String pass) = 6;
 }

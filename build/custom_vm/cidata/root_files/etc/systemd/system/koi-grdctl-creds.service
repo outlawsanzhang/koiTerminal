@@ -1,0 +1,75 @@
+[Unit]
+Description=koiTerminal gnome-remote-desktop credential setter
+JoinsNamespaceOf=koi-namespace.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecCondition=/usr/bin/which grdctl
+# Don't use the TLS cert generated during VM image build. Generate a new one for this VM instance.
+ExecStartPre=/usr/bin/sh -c ' \
+    GRDCERTDIR="/var/lib/gnome-remote-desktop/.cert"; \
+    if [ ! -e "$GRDCERTDIR/refreshed-on-vm.marker" ]; then \
+        /usr/bin/openssl req -new -newkey rsa:4096 -days 7200 -nodes -x509 -subj "/C=SE/ST=NONE/L=NONE/O=GNOME/CN=gnome.org" -out "$GRDCERTDIR/grd-tls.crt" -keyout "$GRDCERTDIR/grd-tls.key" && \
+        /usr/bin/grdctl rdp set-tls-cert "$GRDCERTDIR/grd-tls.crt" && \
+        /usr/bin/grdctl rdp set-tls-key "$GRDCERTDIR/grd-tls.key" && \
+        /usr/bin/touch "$GRDCERTDIR/refreshed-on-vm.marker"; \
+    fi \
+'
+# gnome-remote-desktop credential setter pipe: only koi-vm-manager can write, and only koi-services group can read.
+# linux_vm_manager is responsible for creating /run/linux_vm_manager/koi-grdctl-creds.pipe with koi-vm-manager:gnome-remote-desktop ownership and 660 permission.
+# using python for better handling of password read from a file that needs to be split by lines...
+ExecStart=/usr/bin/python3 -c 'import subprocess; \
+    f = open("/run/linux_vm_manager/koi-grdctl-creds.pipe", "rb"); \
+    passwd = f.read().decode("ascii").split(chr(10))[0]; \
+    f.close(); \
+    print("Read passwd from file. Setting credentials..."); \
+    subprocess.check_call(["/usr/bin/grdctl", "rdp", "set-credentials", "droid", passwd]); \
+    print("Success. Writing confirmation to pipe."); \
+    f = open("/run/linux_vm_manager/koi-grdctl-creds-out.pipe", "wb"); \
+    f.write(b"success"); \
+    f.close(); \
+    print("Done."); \
+'
+ExecStartPost=+/usr/bin/systemctl restart gnome-remote-desktop
+
+# Restart=on-failure
+User=gnome-remote-desktop
+# DynamicUser=yes
+Group=gnome-remote-desktop
+Restart=no
+# RestartSec=1s
+# RestartSteps=8
+# RestartMaxDelaySec=256s
+
+DevicePolicy=closed
+InaccessiblePaths=/run/dbus/ /run/user/
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateIPC=yes
+PrivateNetwork=yes
+ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ReadOnlyPaths=/
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_VSOCK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@aio @chown @keyring @memlock @mount @privileged @resources @setuid memfd_create
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/gnome-remote-desktop
+
+# Triggered only
+# [Install]
+# WantedBy=multi-user.target

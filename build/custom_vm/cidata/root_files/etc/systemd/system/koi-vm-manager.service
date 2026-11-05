@@ -7,7 +7,10 @@ Before=network.target
 JoinsNamespaceOf=koi-namespace.service
 
 [Service]
-ExecStartPre=/usr/bin/sh -c "/usr/bin/mkdir -p /tmp/linux_vm_manager && /usr/bin/chmod 770 /tmp/linux_vm_manager && ( /usr/bin/umask 007 && /usr/bin/mkfifo /tmp/linux_vm_manager/{date,stty}.pipe || /usr/bin/true ) && /usr/bin/chmod 660 /tmp/linux_vm_manager/{date,stty}.pipe"
+ExecStartPre=/usr/bin/sh -c "/usr/bin/umask 007 && /usr/bin/mkdir -p /tmp/linux_vm_manager && /usr/bin/chmod 770 /tmp/linux_vm_manager && ( /usr/bin/umask 007 && /usr/bin/mkfifo /tmp/linux_vm_manager/{date,stty}.pipe /run/linux_vm_manager/koi-grdctl-creds-{out,inactive}.pipe || /usr/bin/true ) && /usr/bin/chmod 660 /tmp/linux_vm_manager/{date,stty}.pipe /run/linux_vm_manager/koi-grdctl-creds-{out,inactive}.pipe"
+# gnome-remote-desktop credential setter pipe: only koi-vm-manager and gnome-remote-desktop group can read write.
+# linux_vm_manager is responsible for moving it to /run/linux_vm_manager/koi-grdctl-creds.pipe.
+ExecStartPre=+/usr/bin/chown koi-vm-manager:gnome-remote-desktop /run/linux_vm_manager/koi-grdctl-creds-out.pipe /run/linux_vm_manager/koi-grdctl-creds-inactive.pipe
 ExecStart=/usr/bin/sh -c '/run/cidata/root_files/usr/local/bin/linux_vm_manager'
 Restart=on-failure
 # User=nobody

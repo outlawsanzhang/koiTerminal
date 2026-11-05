@@ -19,7 +19,7 @@ use crate::binder_err;
 use {
     aidl::com::android::virtualization::debian::aidl::{
         IDebianService::{BnDebianService, IDebianService, VSOCK_PORT},
-        IkoiService::{BnIkoiService, IkoiService, VSOCK_PORT as KOI_VSOCK_PORT, SOCKS5_PORT as KOI_SOCKS5_PORT},
+        IkoiService::{BnIkoiService, IkoiService, self as Ikoi, RemoteDisplay::RemoteDisplay as IkoiRemoteDisplay},
         IkoiHostCallback::{IkoiHostCallback},
         IVmActivePortListener::ActivePort::ActivePort,
         IVmActivePortListener::IVmActivePortListener,
@@ -42,6 +42,15 @@ use vsock::VsockListener;
 
 static MANAGED_PORTS: LazyLock<Mutex<HashSet<u16>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 pub static PROTOCOL_V2: u32 = 2;
+// Files and pipes we interact with
+static SOCKS5_TRIGGER: &str = "/run/linux_vm_manager/socks5.trigger";
+static RDP_PORT_MARKER: &str = "/etc/koi.conf.d/rdp-port.marker";
+static VNC_PORT_MARKER: &str = "/etc/koi.conf.d/vnc-port.marker";
+static DATE_PIPE: &str = "/tmp/linux_vm_manager/date.pipe";
+static STTY_PIPE: &str = "/tmp/linux_vm_manager/stty.pipe";
+static GRDCTL_PIPE: &str = "/run/linux_vm_manager/koi-grdctl-creds.pipe";
+static GRDCTL_OUT_PIPE: &str = "/run/linux_vm_manager/koi-grdctl-creds-out.pipe";
+static GRDCTL_INACTIVE_PIPE: &str = "/run/linux_vm_manager/koi-grdctl-creds-inactive.pipe";
 
 pub struct DebianService {
     rt: Arc<Runtime>,
@@ -271,6 +280,7 @@ pub struct KoiService {
     registered_ports: Mutex<BTreeMap<u16, task::JoinHandle<Result<()>>>>,
     set_time_busy: Arc<Mutex<bool>>,
     resize_tty_busy: Arc<Mutex<bool>>,
+    remote_desktop_creds_set: Arc<Mutex<bool>>,
 }
 
 impl Interface for KoiService {}
@@ -328,12 +338,13 @@ impl KoiService {
             registered_ports: Mutex::new(BTreeMap::new()),
             set_time_busy: Arc::new(Mutex::new(false)),
             resize_tty_busy: Arc::new(Mutex::new(false)),
+            remote_desktop_creds_set: Arc::new(Mutex::new(false)),
         };
 
         let binder = BnIkoiService::new_binder(service);
 
         // rsbinder now supports android/vsock.
-        let vsock_port: u32 = KOI_VSOCK_PORT.try_into().unwrap();
+        let vsock_port: u32 = Ikoi::VSOCK_PORT.try_into().unwrap();
         info!("Setting up koi service rpc server at vsock {vsock_cid}:{vsock_port}");
         let server = RpcServer::setup_vsock_server(vsock_cid, vsock_port) // no loopback allowed
             .inspect_err(|e| error!("Failed to start koi service rpc server at {vsock_cid}:{vsock_port}: {e}")).unwrap();
@@ -451,7 +462,7 @@ impl KoiService {
     }
 
     fn set_socks5_trigger() {
-        std::fs::File::create("/run/linux_vm_manager/socks5.trigger")
+        std::fs::File::create(SOCKS5_TRIGGER)
             .map_err(|e| error!("Failed to create socks5.trigger: {e:?}")).ok();
     }
 
@@ -479,6 +490,33 @@ impl KoiService {
             }
         }
     }
+
+    fn get_supported_remote_desktop_port() -> (i32, i32) {
+        let mut unknown_if_fail = false;
+        for (proto_id, proto) in vec!((Ikoi::RD_RDP, RDP_PORT_MARKER), (Ikoi::RD_VNC, VNC_PORT_MARKER)) {
+            if let Some(port) = (|| {
+                match std::fs::exists(proto) {
+                    Ok(true) => { unknown_if_fail = true; },
+                    Ok(false) => { return None; },
+                    Err(e) => { info!("Cannot query existence of {proto}: {e}"); unknown_if_fail = true; },
+                }
+                let content = std::fs::read(proto)
+                    .inspect_err(|e| info!("{proto} read failure: {e}")).ok()?;
+                String::from_utf8(content)
+                    .inspect_err(|e| info!("{proto} parse failure: {e}")).ok()?
+                    .trim().parse::<u16>()
+                    .inspect_err(|e| info!("{proto} parse failure: {e}")).ok()
+            })() {
+                return (proto_id, port.into());
+            }
+        }
+        if unknown_if_fail {
+            // If none succeeded, but some marker exists, then it is unknown
+            (Ikoi::RD_UNKNOWN, 0)
+        } else {
+            (Ikoi::RD_NONE, 0)
+        }
+    }
 }
 
 impl IkoiService for KoiService {
@@ -502,7 +540,7 @@ impl IkoiService for KoiService {
     fn openReverseConnectedPort(&self, vsock_port: i32) -> BinderResult<()> {
         #[allow(overflowing_literals)]
         let port = vsock_port as u16;
-        if port == KOI_SOCKS5_PORT as u16 {
+        if port == Ikoi::SOCKS5_PORT as u16 {
             Self::set_socks5_trigger();
         }
         info!("koiService: registering reverse-connected port {vsock_port} (port {port})");
@@ -514,12 +552,68 @@ impl IkoiService for KoiService {
     }
 
     fn setTime(&self, epoch: i64) -> BinderResult<()> {
-        self.write_existing_pipe_if_idle("/tmp/linux_vm_manager/date.pipe", format!("@{epoch}\n"), self.set_time_busy.clone());
+        self.write_existing_pipe_if_idle(DATE_PIPE, format!("@{epoch}\n"), self.set_time_busy.clone());
         Ok(())
     }
 
     fn resizeTtyWindow(&self, target: i32, columns: i32, rows: i32) -> BinderResult<()> {
-        self.write_existing_pipe_if_idle("/tmp/linux_vm_manager/stty.pipe", format!("{target},{columns},{rows}\n"), self.resize_tty_busy.clone());
+        self.write_existing_pipe_if_idle(STTY_PIPE, format!("{target},{columns},{rows}\n"), self.resize_tty_busy.clone());
         Ok(())
+    }
+
+    fn setRemoteDesktopCredentials(&self, pass: &str) -> BinderResult<IkoiRemoteDisplay> {
+        let duplicate = "Duplicate calls to setRemoteDesktopCredentials"; // This is a one-shot call.
+        match self.remote_desktop_creds_set.try_lock() {
+            Err(e) => { Err(binder_err(duplicate)(e)) },
+            Ok(mut remote_desktop_creds_set) => {
+                if *remote_desktop_creds_set { return Err(binder_err(duplicate)("past set call successful")); }
+                // Real work starts here
+                // Figure out which remote desktop we have
+                let (proto, port) = Self::get_supported_remote_desktop_port();
+                info!("Detected remote desktop protocol {proto} on port {port}");
+                let result = match proto {
+                    Ikoi::RD_RDP => {
+                        let pass_len = 255;
+                        let failure = Ok(IkoiRemoteDisplay { success: false, proto: proto, port: port });
+                        // Move file to trigger
+                        if let Err(e) = std::fs::rename(GRDCTL_INACTIVE_PIPE, GRDCTL_PIPE) {
+                            error!("Cannot move trigger file: {e}");
+                            return failure;
+                        }
+                        let pass = pass[..pass_len].to_string();
+                        info!("Setting remote desktop password...");
+                        let result = match self.rt.block_on(async move {
+                            tokio::time::timeout(
+                                tokio::time::Duration::from_millis(10*1000),
+                                tokio::spawn(async move {
+                                    // Write password to file (with timeout)
+                                    tokio::fs::write(GRDCTL_PIPE, pass.as_bytes()).await?;
+                                    // Read confirmation from file (with timeout)
+                                    let _ = tokio::fs::read(GRDCTL_OUT_PIPE).await?;
+                                    Ok::<(), std::io::Error>(())
+                                }),
+                            ).await
+                        }) {
+                            Err(e) => { error!("Set RDP credentials timed out: {e}"); failure },
+                            Ok(Err(e)) => { error!("Set RDP credentials aborted: {e}"); failure },
+                            Ok(Ok(Err(e))) => { error!("Set RDP credentials failed: {e}"); failure },
+                            Ok(Ok(Ok(_))) => Ok(IkoiRemoteDisplay { success: true, proto: proto, port: port }),
+                        };
+                        if let Err(e) = std::fs::rename(GRDCTL_PIPE, GRDCTL_INACTIVE_PIPE) {
+                            error!("Cannot put trigger file back: {e}");
+                        }
+                        result
+                    },
+                    Ikoi::RD_NONE => Ok(IkoiRemoteDisplay { success: true, proto: proto, port: port }),
+                    _ => Ok(IkoiRemoteDisplay { success: false, proto: proto, port: 0 }), // including Ikoi::{RD_UNKNOWN, RD_VNC}
+                };
+                if let Ok(ref remote_display) = result {
+                    if remote_display.success {
+                        *remote_desktop_creds_set = true;
+                    }
+                }
+                result
+            },
+        }
     }
 }

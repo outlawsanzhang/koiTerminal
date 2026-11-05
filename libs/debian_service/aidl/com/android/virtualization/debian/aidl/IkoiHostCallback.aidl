@@ -17,5 +17,5 @@ package com.android.virtualization.debian.aidl;
 
 // Communicates with koiTerminal from guest VMs
 interface IkoiHostCallback {
-    void requestReverseConnection(int vsock_port); // will be interpreted as u16
+    void requestReverseConnection(int vsock_port) = 1; // will be interpreted as u16
 }

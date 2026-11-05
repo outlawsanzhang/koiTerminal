@@ -35,8 +35,7 @@ use std::process::exit;
 use std::sync::Arc;
 use log::{error, warn, info};
 
-fn binder_err<T>(message: &str) -> impl Fn(T) -> Status
-where T: std::error::Error
+fn binder_err<T: std::fmt::Debug>(message: &str) -> impl Fn(T) -> Status
 {
     let message_str = message.to_string();
     let wrapper = move |e| Status::new_service_specific_error(-1, Some(format!("{message_str}: {e:?}")));
