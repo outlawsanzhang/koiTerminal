@@ -5,7 +5,7 @@ If neither `kernel` nor `bootloader` is specified in `vm_config.json`, it defaul
 provided by the host OS, which is u-boot.
 
 For GrapheneOS, the default `u-boot.bin` is a pre-built blob from google's repo:
-[[https://github.com/GrapheneOS/platform_manifest/blob/2026012800/default.xml#L22][device/google/cuttlefish_prebuilts]]/[[https://android.googlesource.com/device/google/cuttlefish_prebuilts/+/refs/tags/android-16.0.0_r4/bootloader/crosvm_aarch64/][bootloader/crosvm_aarch64/u-boot.bin]]
+[device/google/cuttlefish_prebuilts](https://github.com/GrapheneOS/platform_manifest/blob/2026012800/default.xml#L22)/[bootloader/crosvm_aarch64/u-boot.bin](https://android.googlesource.com/device/google/cuttlefish_prebuilts/+/refs/tags/android-16.0.0_r4/bootloader/crosvm_aarch64/)
 
 You can also [build `u-boot.bin` from source](https://source.android.com/docs/devices/cuttlefish/bootloader-dev).
 
