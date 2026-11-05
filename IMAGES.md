@@ -41,6 +41,8 @@ dnf copr disable kwizart/kernel-longterm-6.12
 dnf copr enable kwizart/kernel-longterm-6.18 fedora-44-aarch64 -y
 rpm-ostree uninstall kernel-longterm{,-core,-modules,-modules-extra} $(echo --install" "kernel-longterm{,-core,-modules,-modules-extra})
 ```
+1. The console parameter `console=hvc0` really should be `console=ttyS0` except the latter often garbles up boot messages for some reason.
+   But for advanced boot troubleshooting, you may want to change it back to ttyS0 to see systemd unit boot status and the rescue shell.
 
 ### VM image
 - [:dvd: image](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026091900/images.tar.gz)

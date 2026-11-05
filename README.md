@@ -83,31 +83,44 @@ These goals may change, and they may or may not be achievable. We will have to s
 - [X] Experimental: Enable forcing the VM to use the host vpn
     - Supported by disabling network and including a managed SOCKS5 proxy
     - [X] Provide option to control network, SOCKS5, loopback, local network, etc.
-- [ ] Fix Secureblue image
+- [X] Experimental: show desktop GUI by sharing remote desktop configurations
+    - [X] Secureblue GUI
+    - [ ] Debian GUI
+    - [ ] Alpine GUI
+    - [ ] NixOS GUI
+- [ ] Fix Secureblue SELinux issue
+    - https://www.man7.org/linux//man-pages/man8/checkmodule.8.html
+    - https://github.com/SELinuxProject/selinux/wiki/Fix-Policy-Problems
+    - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tag/?h=v6.12.115
+    - https://man7.org/linux/man-pages/man5/semanage.conf.5.html
+    - git clone secureblue to get their policies
+    - modify /etc/selinux/semanage.conf to set policydb version
+- [ ] FIXME for Secureblue image
     - [X] Support port-forwarding and network proxies out-of-the-box
-    - [ ] Add support for display.
+    - [ ] fix audio. sometime there's a loud noise during shutdown
+    - [ ] Add support for actual virtio display once AVF supports it for 3rd-party apps.
+        - See AndroidDisplayContext, ICrosvmAndroidDisplayService
+    - [ ] fix terminal attack vectors
+    - [ ] "canUseTtydOverVsock" && Fix issues when denying NETWORK with this enabled
     - [ ] Add support for file transfer.
+        - [ ] implement SAF over vsock. It should be the host accessing files of the guest, not the other way around, Google
+    - [ ] Fix double-printing of systemd unit launch progress messages at boot
+        - Does not honor some [kernel arguments](https://www.freedesktop.org/software/systemd/man/latest/kernel-command-line.html) (See `man kernel-command-line`)
+    - [ ]  (stretch) fix build script efficiency (depends on Secureblue and GitHub Actions)
 - [ ] FIXME for serial console
     - [X] Make pty changes work
+    - [ ] Keyboard ctrl/alt release not recognized
     - [ ] Make mouse selection / middle button and keyboard Ctrl+Shift+C Ctrl+Insert etc. work in serial terminal
-- [ ]  (stretch) Build 6.12 LTS vanilla kernel RPM package for Secureblue?
 - [ ] Implement a super-config system, including support for multiple `vm_config.json` files for different modes (install, update, use, isolated software, airgap...) or just different VMs.
     - put settings for `console_in`, `default_console` (ttyd/serial), `disposable`, `vm_config_path`, etc. there.
 - [ ] Write a install guide inside the app
-
 - [ ]  (stretch) support some form of checkpointing to enable templates / disposable
     - Try bundling the compiled crosvm binary when building GrapheneOS. See: https://u1f383.github.io/android/2025/06/15/run-native-binary-on-android.html
     - Try passing file descriptors to avoid permission issues
-- [ ] FIXME for serial console
-    - [ ] Find out which kernel versions and what configurations work. How about 6.6 LTS?
 - [ ] Support `images.zip` in addition to `images.tar.gz`
 - [ ]  (stretch) Add back gutted features
-    - Something to replace virtiofs (seamless file sharing)
     - Something to replace dynamic VM storage resizing
-    - Make the display work
     - Make the mouse work (offset issue)
-- [ ] Support holding modifier keys (in ttyd too)
-- [ ]  (stretch) WebUSB forwarding device to the VM
 - [ ]  (stretch) VM image for Windows guests (image subject to DMCA, but build scripts / conversion scripts should live)
 - [ ]  (stretch) VM image for Android guests
 - [X]  (stretch) Compile u-boot
