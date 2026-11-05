@@ -16,5 +16,6 @@
 
 <paths>
     <files-path path="bugreport/" name="bugreport" />
+    <files-path path="remote_desktop/" name="remote_desktop" />
 </paths>
 

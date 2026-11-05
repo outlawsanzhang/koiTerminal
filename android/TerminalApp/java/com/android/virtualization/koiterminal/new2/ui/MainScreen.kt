@@ -16,6 +16,11 @@
 package com.android.virtualization.koiterminal.new2.ui
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
@@ -35,21 +40,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Monitor
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,16 +74,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.android.virtualization.debian.aidl.IkoiService
 import com.android.virtualization.koiterminal.BetterBugLauncher
+import com.android.virtualization.koiterminal.InstalledImage
+import com.android.virtualization.koiterminal.KoiService
 import com.android.virtualization.koiterminal.R
 import com.android.virtualization.koiterminal.new2.core.InstallState
 import com.android.virtualization.koiterminal.new2.core.Installer
+import com.android.virtualization.koiterminal.new2.core.VmController
 import com.android.virtualization.koiterminal.new2.ui.main.DisplayState
 import com.android.virtualization.koiterminal.new2.ui.main.MainUiState
 import com.android.virtualization.koiterminal.new2.ui.main.MainViewModel
+import java.io.FileOutputStream
+import java.nio.file.Files
 import kotlinx.coroutines.delay
 
 @Composable
@@ -190,6 +211,18 @@ fun RunningScreen(state: MainUiState.Running, viewModel: MainViewModel) {
     val selectedTabId by viewModel.selectedTabId.collectAsStateWithLifecycle()
     val displayState by viewModel.displayState.collectAsStateWithLifecycle()
     val isFullscreen by viewModel.isFullscreen.collectAsStateWithLifecycle()
+    var showRemoteDesktopDialog by remember { mutableStateOf(false) }
+
+    if (showRemoteDesktopDialog) {
+        RemoteDesktopDialog(
+            viewModel = viewModel,
+            quickViewPossible = false,
+            onDismissRequest = { showRemoteDesktopDialog = false },
+            onConfirm = { quickView, newConfig, copyPass ->
+                showRemoteDesktopDialog = false
+            },
+        )
+    }
 
     Column {
         if (!isFullscreen) {
@@ -208,7 +241,12 @@ fun RunningScreen(state: MainUiState.Running, viewModel: MainViewModel) {
                         onAddSerialTab = { viewModel.addSerialTab() },
                     )
                 }
-                DisplayController(viewModel = viewModel)
+                // DisplayController(viewModel = viewModel)
+                IconButton(
+                    onClick = { showRemoteDesktopDialog = !showRemoteDesktopDialog }
+                ) {
+                    Icon(Icons.Outlined.Monitor, contentDescription = stringResource(R.string.dispctrl_hint_options))
+                }
                 IconButton(
                     onClick = {
                         viewModel.setShowSettings(true)
@@ -232,6 +270,203 @@ fun RunningScreen(state: MainUiState.Running, viewModel: MainViewModel) {
         }
     }
 }
+
+enum class RemoteDesktopOption(val titleRes: Int, val descRes: Int) {
+    QUICK_VIEW(R.string.remote_desktop_quick_view, R.string.remote_desktop_quick_view_desc),
+    CONFIGURED_VIEW(R.string.remote_desktop_view_in_app, R.string.remote_desktop_view_in_app_desc);
+
+    companion object {
+        fun getDefault(quickViewPossible: Boolean): RemoteDesktopOption {
+            if (quickViewPossible) return QUICK_VIEW
+            else return CONFIGURED_VIEW
+        }
+    }
+}
+
+@Composable
+fun RemoteDesktopDialog(
+    viewModel: MainViewModel,
+    quickViewPossible: Boolean,
+    onDismissRequest: () -> Unit,
+    onConfirm: (RemoteDesktopOption, Boolean, Boolean) -> Unit,
+) {
+    // FIXME: quick view (freerdp only), red warning, actual cross-run persist, screen size (multiples of 30 inside safe margins should be good)
+
+    // options: quick view vs. open an RDP app. is options when aFreeRDP is installed and active, else title.
+    // checkboxes: share config (only when quick view is selected), copy password
+    // turning any of these from on to off shows red warning, but not if they were like that before
+    var selected by remember { mutableStateOf(RemoteDesktopOption.getDefault(quickViewPossible)) }
+    var newConfig by remember { mutableStateOf(true) }
+    var copyPass by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+
+    LaunchedEffect(quickViewPossible) {
+        if (selected == RemoteDesktopOption.QUICK_VIEW && !quickViewPossible) {
+            selected = RemoteDesktopOption.CONFIGURED_VIEW
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text(stringResource(R.string.remote_desktop_view_launch_title)) },
+        text = {
+            Column {
+                Column(Modifier.selectableGroup()) {
+                    RemoteDesktopOption.entries.forEachIndexed { index, option ->
+                        val enabled = option != RemoteDesktopOption.QUICK_VIEW || quickViewPossible
+                        val isSelected = option == selected
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .height(64.dp)
+                                .selectable(
+                                    enabled = enabled,
+                                    selected = isSelected,
+                                    onClick = { selected = option },
+                                    role = Role.RadioButton,
+                                )
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = isSelected, onClick = null)
+                            Column(modifier = Modifier.padding(start = 16.dp)) {
+                                Text(
+                                    text = stringResource(option.titleRes),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = stringResource(option.descRes),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                            }
+                        }
+                    }
+                }
+                Column {
+                    AnimatedVisibility(
+                        visible = selected == RemoteDesktopOption.CONFIGURED_VIEW,
+                        enter = slideInHorizontally(initialOffsetX = { it }),
+                        exit = slideOutHorizontally(targetOffsetX = { it }),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .toggleable(value = newConfig, role = Role.Switch) { newConfig = it }
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Switch(checked = newConfig, onCheckedChange = { newConfig = it })
+                            Text(
+                                modifier = Modifier.padding(start = 16.dp),
+                                text = stringResource(R.string.remote_desktop_new_config),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .toggleable(value = copyPass, role = Role.Switch) { copyPass = it }
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Switch(checked = copyPass, onCheckedChange = { copyPass = it })
+                        Text(
+                            modifier = Modifier.padding(start = 16.dp),
+                            text = stringResource(R.string.remote_desktop_copy_password),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                viewRemoteDesktop(selected, newConfig, copyPass, context)
+                onConfirm(selected, newConfig, copyPass)
+            }) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+fun viewRemoteDesktop(
+    mode: RemoteDesktopOption,
+    newConfig: Boolean,
+    copyPass: Boolean,
+    context: Context
+) {
+    val remoteDesktop = VmController.remoteDesktop
+    if (remoteDesktop == null) return
+    VmController.enablePortForwarding(remoteDesktop.port, true)
+    if (copyPass) {
+        (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.let { cm ->
+            val clip: ClipData = ClipData.newPlainText("RDP password", remoteDesktop.pass)
+            cm.setPrimaryClip(clip)
+        }
+    }
+    when (remoteDesktop.proto) {
+        IkoiService.RD_RDP -> {
+            when (mode) {
+                RemoteDesktopOption.QUICK_VIEW -> {}
+                RemoteDesktopOption.CONFIGURED_VIEW -> {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        if (newConfig) {
+                            val rdpUri = makeRdpConfigFile(context, remoteDesktop.port)
+                            if (rdpUri == null) return // User specified newConfig, but can't. Break visibly
+                            setDataAndType(rdpUri, "application/x-rdp")
+                        } else {
+                            type = "application/x-rdp"
+                        }
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(intent)
+                }
+            }
+        }
+        else -> { return }
+    }
+}
+
+fun makeRdpConfigFile(context: Context, port: Int): Uri? {
+    // val rdpFile = image.installDir.resolve(KOI_CONFIG_FILENAME)
+    val dir = context.getFileStreamPath(KoiService.RD_SHARE_DIR)
+    val rdpFile = dir.resolve(KoiService.RD_SHARE_RDP)
+    try {
+        Files.createDirectories(dir.toPath())
+        val stream = FileOutputStream(rdpFile)
+        stream.write(
+            // This is the default saved from aFreeRDP
+"""
+full address:s:localhost
+username:s:droid
+session bpp:i:32
+disable wallpaper:i:0
+allow font smoothing:i:1
+allow desktop composition:i:1
+disable menu anims:i:0
+disable themes:i:0
+disable full window drag:i:0
+"""
+            .replace("localhost", "localhost:${port}")
+            .toByteArray()
+        )
+        stream.close()
+    } catch (e: Exception) {
+        Log.w("MainScreen", "Failed to create .rdp file. Skipping.", e)
+        return null
+    }
+    
+    val rdpUri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", rdpFile)
+    Log.d("MainScreen", "Intent with Uri.fromFile($rdpFile) = ${Uri.fromFile(rdpFile)}")
+    Log.d("MainScreen", "Intent with FileProvider.getUriForFile($rdpFile) = ${rdpUri}")
+    return rdpUri
+}
+
 
 private suspend fun handleError(
     activity: Activity,

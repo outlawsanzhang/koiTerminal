@@ -162,6 +162,21 @@
     <!-- Content description for the button to open display options. [CHAR LIMIT=none] -->
     <string name="dispctrl_hint_options">Display options</string>
 
+    <!-- Title of the confirmation dialog when opening a remote desktop viewer. [CHAR LIMIT=none] -->
+    <string name="remote_desktop_view_launch_title">View display with remote desktop</string>
+    <!-- View in an app that supports quick view. [CHAR LIMIT=none] -->
+    <string name="remote_desktop_quick_view">Quick view</string>
+    <!-- View in an app that supports quick view. [CHAR LIMIT=none] -->
+    <string name="remote_desktop_quick_view_desc">Use default viewer settings</string>
+    <!-- View in an app that supports persistent config import. [CHAR LIMIT=none] -->
+    <string name="remote_desktop_view_in_app">Configure and view</string>
+    <!-- View in an app that supports persistent config import. [CHAR LIMIT=none] -->
+    <string name="remote_desktop_view_in_app_desc">Edit viewer settings after opening</string>
+    <!-- View in an app that supports persistent config import. [CHAR LIMIT=none] -->
+    <string name="remote_desktop_new_config">Add as new connection</string>
+    <!-- View in an app that supports persistent config import. [CHAR LIMIT=none] -->
+    <string name="remote_desktop_copy_password">Copy connection password</string>
+
 
     <!-- ================================================================= -->
     <!-- Modifier Keys                                                     -->
