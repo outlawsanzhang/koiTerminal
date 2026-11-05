@@ -1,10 +1,11 @@
 [Unit]
-Description=koiTerminal tunnel setup
+Description=koiTerminal tunnel setup. Deprecated in favor of nmcli setup
 Before=network-pre.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+ExecCondition=/usr/bin/sh -c '! /usr/bin/which nmcli'
 ExecStart=/usr/bin/sh -c ' \
     /usr/bin/ip tuntap add dev koi mode tun pi on && \
     /usr/bin/ip link set dev koi addrgenmode random up && \

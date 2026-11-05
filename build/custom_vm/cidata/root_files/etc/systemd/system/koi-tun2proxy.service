@@ -8,8 +8,9 @@ JoinsNamespaceOf=koi-namespace.service
 [Service]
 ExecStart=/usr/bin/sh -c '/run/cidata/root_files/usr/local/bin/tun2proxy-bin --proxy socks5://127.0.0.1:10805 --tun koi -6 --dns virtual --bypass 198.18.0.0/15'
 Restart=on-failure
-# User=nobody
-DynamicUser=yes
+# special user that owns the gunnel
+User=koi-tun2proxy
+# DynamicUser=yes
 RestartSec=1s
 RestartSteps=8
 RestartMaxDelaySec=256s
