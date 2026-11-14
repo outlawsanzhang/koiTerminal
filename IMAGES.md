@@ -50,7 +50,7 @@ rpm-ostree uninstall kernel-longterm{,-core,-modules,-modules-extra} $(echo --in
 
 ### VM image
 - [:dvd: image](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026110200/images.tar.gz)
-- [:lock_with_ink_pen: signature]() temporarily unavailable. SHA256SUM: 
+- [:lock_with_ink_pen: signature]() temporarily unavailable. SHA256SUM: 154f411c7e586abd280007e95582e2614222facdb76719671ec9147c077b4917
 - [:hammer_and_wrench: building guide](build/custom_vm/secureblue/README.md)
 
 # NixOS
