@@ -10,6 +10,8 @@ Hats off to their very recent ARM support.
 
 :gift: Now with support for network control, Android VPN support, and port-forwarding.
 
+🎁 Now with graphical display using remote desktop.
+
 ### Known issues
 > [!IMPORTANT]
 > Due to kernel version issues, a Long-Term Support kernel version compiled by a Fedora maintainer for Fedora is used.
@@ -17,6 +19,8 @@ Hats off to their very recent ARM support.
 > This does add an extra trusted party and would require manual maintenance to, for example, switch to a COPR for a newer kernel LTS branch.
 > 
 > An improvement over the previous situation is, these kernel packages follow the latest LTS updates, so they are no longer subject to years of known vulnerabilities.
+>
+> In addition, this experimental release has a critical issue that an update to the latest Secure blue release will break the system due to a SELinux version issue and a Fedora upgrade. Please wait for the next release if you care about the security inside the VM. 
 
 1. Automatic VM shutdown has a terribly short timeout (5 seconds). Please shutdown within the VM after use (`run0 poweroff`).
 1. Display does not work.
@@ -45,8 +49,8 @@ rpm-ostree uninstall kernel-longterm{,-core,-modules,-modules-extra} $(echo --in
    But for advanced boot troubleshooting, you may want to change it back to ttyS0 to see systemd unit boot status and the rescue shell.
 
 ### VM image
-- [:dvd: image](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026091900/images.tar.gz)
-- [:lock_with_ink_pen: signature](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026091900/images.tar.gz.SHA256SUM.asc)
+- [:dvd: image](https://koiterminal-cloudflare-redirects.outlawsanzhang.workers.dev/downloads/vm-images/secureblue/2026110200/images.tar.gz)
+- [:lock_with_ink_pen: signature]() temporarily unavailable. SHA256SUM: 
 - [:hammer_and_wrench: building guide](build/custom_vm/secureblue/README.md)
 
 # NixOS
